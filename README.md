@@ -55,6 +55,12 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.5
+- "Usar minha localização" já busca a altitude do ponto.
+- Confirmação de envio/cancelamento na CIDASC mostra o ambiente (produção ou homologação).
+- Recusa do SIGEN por coordenadas fora do município vira aviso claro com as coordenadas e o que
+  corrigir.
+
 ### 0.0.4
 - Envio e cancelamento da receita no SIGEN da CIDASC dentro do app (antes o `receita_e.exe`),
   pelas ações da lista e automaticamente na impressão com `EXIGE_CIDASC_IMPRESSAO=S`.

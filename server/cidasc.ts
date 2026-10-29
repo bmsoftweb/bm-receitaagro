@@ -185,6 +185,13 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
     // "Este receituário já foi informado... Código no sistema NNN": guarda o número que o SIGEN já tem
     const ja = envio.texto.match(/C[óo]digo no sistema\D*(\d+)/i);
     if (ja) await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_CIDASC = :nr, SESSIONID = :sess WHERE ID = :id', { nr: Number(ja[1]), sess: sessao, id });
+    // O SIGEN junta essa recusa ao texto da regra do campo IBGE, que confunde: explica o que corrigir
+    if (/coordenadas inv[áa]lidas/i.test(msg)) {
+      throw new BmapiError(
+        `A latitude/longitude da receita (${n(r.lat)}; ${n(r.lon)}) não fica no município do cliente (IBGE ${s(r.ibge)}). ` +
+        'Corrija o local da aplicação nos dados iniciais da receita. "Usar minha localização" só serve quando você está na propriedade.',
+      );
+    }
     throw new BmapiError(msg);
   }
 

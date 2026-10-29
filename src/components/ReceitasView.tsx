@@ -475,18 +475,21 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
     setGeo('gps');
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        setR((x) => ({ ...x, latitude: Number(p.coords.latitude.toFixed(6)), longitude: Number(p.coords.longitude.toFixed(6)), altitude: p.coords.altitude ? Math.round(p.coords.altitude) : x.altitude }));
-        setGeo(null);
+        const latitude = Number(p.coords.latitude.toFixed(6));
+        const longitude = Number(p.coords.longitude.toFixed(6));
+        setR((x) => ({ ...x, latitude, longitude, altitude: p.coords.altitude ? Math.round(p.coords.altitude) : x.altitude }));
+        // Já busca a altitude do ponto (a do GPS costuma faltar ou vir imprecisa)
+        buscarAltitude(latitude, longitude);
       },
       (e) => { setErro(`Localização indisponível: ${e.message}`); setGeo(null); },
       { enableHighAccuracy: true, timeout: 15000 },
     );
   };
 
-  const buscarAltitude = async () => {
+  const buscarAltitude = async (lat = r.latitude, lon = r.longitude) => {
     try {
       setGeo('alt');
-      const { altitude } = await get<{ altitude: number }>(`/api/receitas/altitude${qs({ lat: r.latitude, lon: r.longitude })}`);
+      const { altitude } = await get<{ altitude: number }>(`/api/receitas/altitude${qs({ lat, lon })}`);
       setR((x) => ({ ...x, altitude }));
     } catch (e: any) {
       setErro(e.message);
@@ -654,7 +657,7 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
         {!dis && (
           <div className="col-span-6 flex flex-wrap gap-2 -mt-1">
             <button type="button" onClick={minhaLocalizacao} disabled={Boolean(geo)} className={BTN_SECUNDARIO}>{geo === 'gps' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}Usar minha localização</button>
-            <button type="button" onClick={buscarAltitude} disabled={Boolean(geo) || !r.latitude || !r.longitude} className={BTN_SECUNDARIO}>{geo === 'alt' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mountain className="w-3.5 h-3.5" />}Buscar altitude</button>
+            <button type="button" onClick={() => buscarAltitude()} disabled={Boolean(geo) || !r.latitude || !r.longitude} className={BTN_SECUNDARIO}>{geo === 'alt' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mountain className="w-3.5 h-3.5" />}Buscar altitude</button>
             {Boolean(r.latitude && r.longitude) && (
               <a href={`https://www.google.com/maps?q=${r.latitude},${r.longitude}`} target="_blank" rel="noopener noreferrer" className={BTN_SECUNDARIO}><ExternalLink className="w-3.5 h-3.5" />Ver no mapa</a>
             )}
@@ -869,6 +872,11 @@ export const ReceitasView: React.FC = () => {
   const [processando, setProcessando] = useState(false);
   // Envio ou cancelamento no SIGEN da CIDASC (receita_e.exe)
   const [cidasc, setCidasc] = useState<{ r: Receita; cancelar: boolean } | null>(null);
+  // Ambiente do SIGEN (rec_config.url_ws), mostrado na confirmação do envio
+  const [sigenProducao, setSigenProducao] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (cidasc) get<{ urlWs: string }>('/api/rec-config').then((c) => setSigenProducao(!/homologacao/i.test(c.urlWs))).catch(() => setSigenProducao(null));
+  }, [cidasc]);
 
   const confirmarCidasc = async () => {
     if (!cidasc) return;
@@ -1042,6 +1050,7 @@ export const ReceitasView: React.FC = () => {
       {cidasc && (
         <ConfirmModal
           titulo={cidasc.cancelar ? 'Cancelar na CIDASC' : 'Enviar à CIDASC'}
+          subtitulo={sigenProducao === null ? undefined : sigenProducao ? 'Ambiente: PRODUÇÃO' : 'Ambiente: homologação (testes)'}
           mensagem={cidasc.cancelar
             ? <>Cancelar no SIGEN a receita <strong>{cidasc.r.numeroReceitaFull}</strong> (CIDASC nº {cidasc.r.numeroReceitaCidasc}) de {cidasc.r.cliente}?</>
             : <>Transmitir ao SIGEN da CIDASC a receita <strong>{cidasc.r.numeroReceitaFull || `#${cidasc.r.id}`}</strong> de {cidasc.r.cliente}? {!cidasc.r.numeroReceita && 'A receita recebe o número agora.'} Depois de enviada, ela não pode mais ser alterada.</>}

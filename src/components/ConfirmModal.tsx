@@ -5,6 +5,7 @@ import { BTN_PRIMARIO, BTN_SECUNDARIO } from '../utils/listaStyles';
 
 interface ConfirmModalProps {
   titulo: string;
+  subtitulo?: string;
   mensagem: React.ReactNode;
   textoConfirmar?: string;
   /** Ação que não apaga (ex.: enviar): botão na cor principal */
@@ -18,6 +19,7 @@ interface ConfirmModalProps {
 /** Confirmação padrão para toda ação de excluir/remover */
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   titulo,
+  subtitulo,
   mensagem,
   textoConfirmar = 'Excluir',
   neutro,
@@ -26,7 +28,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirmar,
   onCancelar,
 }) => (
-  <Modal isOpen onClose={onCancelar} title={titulo} size="sm">
+  <Modal isOpen onClose={onCancelar} title={titulo} subtitle={subtitulo} size="sm">
     <div className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">{mensagem}</div>
     <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
       <button type="button" onClick={onCancelar} disabled={processando} className={BTN_SECUNDARIO}>
