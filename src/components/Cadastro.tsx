@@ -341,7 +341,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         <span title={p.somenteLeitura} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-900">
           <Lock className="w-3 h-3" /> Somente Leitura
         </span>, seloTitulo)}
-      {erro && <AvisoErro mensagem={erro} onFechar={() => setErro(null)} className="mx-4 mt-3 shrink-0" />}
+      {erro && <AvisoErro mensagem={erro} onFechar={() => setErro(null)} className="mx-4 my-3 shrink-0" />}
 
       <div className={GRADE_AREA}>
         <table className={TABELA}>

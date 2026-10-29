@@ -55,6 +55,13 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.6
+- Localização pelo Google Maps: "Escolher no Google Maps" abre o mapa em satélite; as coordenadas
+  copiadas lá (botão direito no ponto → clicar nos números) entram com Ctrl+V ou "Colar
+  coordenadas", e a altitude é buscada em seguida.
+- Erro do envio à CIDASC pela lista não some mais (a lista recarregava e limpava o aviso).
+- Aviso de erro das listas com espaço abaixo; datas do filtro de receitas não encolhem.
+
 ### 0.0.5
 - "Usar minha localização" já busca a altitude do ponto.
 - Confirmação de envio/cancelamento na CIDASC mostra o ambiente (produção ou homologação).

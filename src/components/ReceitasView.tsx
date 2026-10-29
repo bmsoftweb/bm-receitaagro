@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, RefreshCw, Loader2, Save, ChevronRight, Lock, Inbox, MapPin,
-  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy,
+  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy, ClipboardPaste,
 } from 'lucide-react';
 import { get, send, qs } from '../services/api';
 import { Opcao, Receita, ProdutoReceita, Tratamento } from '../types';
@@ -38,7 +38,7 @@ interface Apoio {
 
 /** Erro com "x" e fechamento automático (AvisoErro do crmWeb) */
 const Erro: React.FC<{ msg: string | null; onFechar: () => void; inline?: boolean }> = ({ msg, onFechar, inline }) =>
-  msg ? <AvisoErro mensagem={msg} onFechar={onFechar} className={inline ? '' : 'mx-4 mt-3 shrink-0'} /> : null;
+  msg ? <AvisoErro mensagem={msg} onFechar={onFechar} className={inline ? '' : 'mx-4 my-3 shrink-0'} /> : null;
 
 const Campo: React.FC<{ rotulo: string; className?: string; children: React.ReactNode }> = ({ rotulo, className, children }) => (
   <div className={className}>
@@ -486,6 +486,50 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
     );
   };
 
+  /** Coordenadas copiadas do Google Maps (botão direito no ponto → clicar nos números): "-27.41234, -49.60123" */
+  const colarCoordenadas = (texto: string) => {
+    const m = texto.match(/(-?\d{1,2}[.,]\d+)\s*[,;\s]\s*(-?\d{1,3}[.,]\d+)/);
+    if (!m) return false;
+    const latitude = Number(Number(m[1].replace(',', '.')).toFixed(6));
+    const longitude = Number(Number(m[2].replace(',', '.')).toFixed(6));
+    if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return false;
+    setR((x) => ({ ...x, latitude, longitude }));
+    buscarAltitude(latitude, longitude);
+    toast('Coordenadas do Google Maps aplicadas.');
+    return true;
+  };
+
+  const colarDaAreaDeTransferencia = async () => {
+    try {
+      if (!colarCoordenadas(await navigator.clipboard.readText())) setErro('Não há coordenadas copiadas. No Google Maps, clique com o botão direito no ponto e depois nos números (latitude, longitude).');
+    } catch {
+      setErro('O navegador não liberou a área de transferência. Use Ctrl+V nesta tela.');
+    }
+  };
+
+  /** Google Maps em satélite no ponto atual ou, sem ele, na localidade do cliente */
+  const abrirMaps = () => {
+    const loc = localidades.find((l) => l.id === r.idLocalidade)?.descricao;
+    const url = r.latitude && r.longitude
+      ? `https://www.google.com/maps/@${r.latitude},${r.longitude},17z/data=!3m1!1e3`
+      : `https://www.google.com/maps/search/${encodeURIComponent(`${loc || r.localAplicacao || ''} SC`)}/data=!3m1!1e3`;
+    window.open(url, '_blank', 'noopener');
+  };
+
+  // Ctrl+V com coordenadas em qualquer lugar dos dados iniciais (fora de outro campo de texto) preenche latitude/longitude
+  useEffect(() => {
+    const colar = (e: ClipboardEvent) => {
+      if (etapa !== 0 || bloqueada || !form.current?.offsetParent) return;
+      const alvo = e.target as HTMLElement;
+      // Em outro campo, o Ctrl+V é normal; na latitude/longitude, o par preenche as duas
+      if (!alvo.closest?.('[data-coord]') && alvo.matches?.('textarea, input')) return;
+      if (colarCoordenadas(e.clipboardData?.getData('text') || '')) { e.preventDefault(); e.stopPropagation(); }
+    };
+    // Captura: roda antes do onPaste do NumberField
+    document.addEventListener('paste', colar, true);
+    return () => document.removeEventListener('paste', colar, true);
+  });
+
   const buscarAltitude = async (lat = r.latitude, lon = r.longitude) => {
     try {
       setGeo('alt');
@@ -646,10 +690,10 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
           <input required disabled={dis} maxLength={80} value={r.localAplicacao || ''} onChange={(e) => setR({ ...r, localAplicacao: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} />
         </Campo>
         <Campo rotulo="Latitude" className="col-span-2 sm:col-span-1">
-          <div className={FIELD_WRAPPER_CLASS}><NumberField scale={6} allowNegative required disabled={dis} value={r.latitude} onChange={(v) => setR({ ...r, latitude: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
+          <div data-coord className={FIELD_WRAPPER_CLASS}><NumberField scale={6} allowNegative required disabled={dis} value={r.latitude} onChange={(v) => setR({ ...r, latitude: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
         </Campo>
         <Campo rotulo="Longitude" className="col-span-2 sm:col-span-1">
-          <div className={FIELD_WRAPPER_CLASS}><NumberField scale={6} allowNegative required disabled={dis} value={r.longitude} onChange={(v) => setR({ ...r, longitude: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
+          <div data-coord className={FIELD_WRAPPER_CLASS}><NumberField scale={6} allowNegative required disabled={dis} value={r.longitude} onChange={(v) => setR({ ...r, longitude: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
         </Campo>
         <Campo rotulo="Altitude (m)" className="col-span-2 sm:col-span-1">
           <div className={FIELD_WRAPPER_CLASS}><NumberField scale={0} required disabled={dis} value={r.altitude} onChange={(v) => setR({ ...r, altitude: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
@@ -658,9 +702,9 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
           <div className="col-span-6 flex flex-wrap gap-2 -mt-1">
             <button type="button" onClick={minhaLocalizacao} disabled={Boolean(geo)} className={BTN_SECUNDARIO}>{geo === 'gps' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}Usar minha localização</button>
             <button type="button" onClick={() => buscarAltitude()} disabled={Boolean(geo) || !r.latitude || !r.longitude} className={BTN_SECUNDARIO}>{geo === 'alt' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mountain className="w-3.5 h-3.5" />}Buscar altitude</button>
-            {Boolean(r.latitude && r.longitude) && (
-              <a href={`https://www.google.com/maps?q=${r.latitude},${r.longitude}`} target="_blank" rel="noopener noreferrer" className={BTN_SECUNDARIO}><ExternalLink className="w-3.5 h-3.5" />Ver no mapa</a>
-            )}
+            <button type="button" onClick={abrirMaps} className={BTN_SECUNDARIO} title="No Google Maps, clique com o botão direito no ponto e depois nos números para copiar; volte aqui e use Ctrl+V"><ExternalLink className="w-3.5 h-3.5" />Escolher no Google Maps</button>
+            <button type="button" onClick={colarDaAreaDeTransferencia} disabled={Boolean(geo)} className={BTN_SECUNDARIO} title="Cola as coordenadas copiadas do Google Maps (ou Ctrl+V)"><ClipboardPaste className="w-3.5 h-3.5" />Colar coordenadas</button>
+            <span className="self-center text-[11px] text-stone-500">No Maps: botão direito no ponto → clique nos números → volte e Ctrl+V.</span>
           </div>
         )}
         </>}
@@ -880,16 +924,19 @@ export const ReceitasView: React.FC = () => {
 
   const confirmarCidasc = async () => {
     if (!cidasc) return;
+    let falha = '';
     try {
       setProcessando(true);
       const r = await send<{ mensagem: string }>('POST', `/api/receitas/${cidasc.r.id}/cidasc${cidasc.cancelar ? '/cancelar' : ''}`);
       toast(r.mensagem);
     } catch (e: any) {
-      setErro(e.message);
+      falha = e.message;
     } finally {
       setProcessando(false);
       setCidasc(null);
-      carregar();
+      // Recarrega antes de mostrar o erro: o carregar limpa o aviso
+      await carregar();
+      if (falha) setErro(falha);
     }
   };
 
@@ -984,8 +1031,8 @@ export const ReceitasView: React.FC = () => {
             <option value={0}>Todas as ARTs</option>
             {apoio?.arts.map((a) => <option key={a.id} value={a.id}>{a.numero}</option>)}
           </Selecao>
-          <div className="w-36"><DateField value={filtro.d1} onChange={(d1) => setFiltro({ ...filtro, d1 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} /></div>
-          <div className="w-36"><DateField value={filtro.d2} onChange={(d2) => setFiltro({ ...filtro, d2 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} placeholder="até hoje" /></div>
+          <div className="w-36 shrink-0"><DateField value={filtro.d1} onChange={(d1) => setFiltro({ ...filtro, d1 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} /></div>
+          <div className="w-36 shrink-0"><DateField value={filtro.d2} onChange={(d2) => setFiltro({ ...filtro, d2 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} placeholder="até hoje" /></div>
           <button type="button" onClick={carregar} disabled={loading} title="Recarregar" className={BTN_SECUNDARIO}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /></button>
           <button type="button" disabled={!apoio} onClick={() => abrir(0)} className={BTN_PRIMARIO}><Plus className="w-3.5 h-3.5" /><span>Nova</span></button>
         </div>
