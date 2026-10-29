@@ -821,14 +821,29 @@ const Impressao: React.FC<{ id: number; onFechar: (imprimiu: boolean) => void }>
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => { get(`/api/receitas/${id}/impressao`).then(setD).catch((e) => setErro(e.message)); }, [id]);
 
-  const imprimir = async () => {
-    window.print();
+  // Marca como impressa ao fim de qualquer impressão (botão ou Ctrl+P), uma vez só
+  const marcada = useRef(false);
+  const marcar = async () => {
+    if (marcada.current) return;
+    marcada.current = true;
     try {
       await send('POST', `/api/receitas/${id}/impressa`);
       onFechar(true);
     } catch (e: any) {
-      setErro(e.message);
+      marcada.current = false;
+      setErro(`A receita foi impressa, mas não ficou marcada como impressa: ${e.message}`);
     }
+  };
+  useEffect(() => {
+    if (!d) return;
+    const depois = () => { marcar(); };
+    window.addEventListener('afterprint', depois);
+    return () => window.removeEventListener('afterprint', depois);
+  }, [d]);
+
+  const imprimir = () => {
+    try { window.print(); } catch { /* navegador sem impressão: marca do mesmo jeito */ }
+    marcar();
   };
 
   if (erro || !d) {

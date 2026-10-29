@@ -55,6 +55,11 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.7
+- Impressão marca a receita como impressa também quando sai pelo Ctrl+P; se a marcação falhar,
+  aparece aviso.
+- Erros das rotas registrados no log do servidor.
+
 ### 0.0.6
 - Localização pelo Google Maps: "Escolher no Google Maps" abre o mapa em satélite; as coordenadas
   copiadas lá (botão direito no ponto → clicar nos números) entram com Ctrl+V ou "Colar

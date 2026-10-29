@@ -4,6 +4,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 export function rota(fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler {
   return (req: Request, res: Response, _next: NextFunction) => {
     fn(req, res).catch((err: any) => {
+      console.error(`[erro] ${req.method} ${req.originalUrl}: ${err?.message}`);
       if (!res.headersSent) res.status(err?.status || 500).json({ error: err?.message || 'Erro inesperado.' });
     });
   };
