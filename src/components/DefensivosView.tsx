@@ -295,6 +295,7 @@ export const DefensivosView: React.FC = () => {
       {aviso && <AvisoErro mensagem={aviso} onFechar={() => setAviso(null)} className="mx-4 mt-3 shrink-0" />}
       <Cadastro<Defensivo>
         nome="defensivo"
+        titulo="Defensivos"
         chaveRecarga={String(recarga)}
         carregar={async (q) => (await get<{ defensivos: Defensivo[] }>(`/api/defensivos${qs({ q })}`)).defensivos}
         descrever={(d) => d.nome}

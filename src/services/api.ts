@@ -49,21 +49,23 @@ export async function send<T = any>(method: string, url: string, body?: unknown)
 // ------------------------------------------------------------
 // Autenticação
 // ------------------------------------------------------------
-export async function login(
-  servidor: number,
-  email: string,
-  senha: string,
-): Promise<{ token: string; usuario: Usuario; empresa: Empresa; servidor: ServidorInfo }> {
+export async function login(token: string): Promise<{ token: string; usuario: Usuario; empresa: Empresa; servidor: ServidorInfo }> {
   const res = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ servidor, email, senha }),
+    body: JSON.stringify({ token }),
   });
   return parseOrThrow(res);
 }
 
-export async function consultarServidor(numero: number): Promise<{ identificacao: string; connected: boolean; nomeEmpresa?: string | null; error?: string }> {
-  return get(`/api/servidores/${numero}`);
+export async function consultarServidor(token: string): Promise<{ identificacao: string; connected: boolean; nomeEmpresa?: string | null; error?: string }> {
+  return parseOrThrow(
+    await fetch('/api/servidores/verificar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
+  );
 }
 
 export async function validarSessao(): Promise<{ usuario: Usuario; empresa: Empresa; servidor: ServidorInfo }> {

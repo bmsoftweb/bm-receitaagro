@@ -57,6 +57,16 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.3
+- Login pelo token do servidor (bmapi.servidores.token) no lugar do número; sem usuário e senha.
+  Tela de login no modelo do crmWeb, marca BM-ReceitaAgro.
+- Paleta verde-escuro, sálvia, creme e terracota (campo obrigatório).
+- Cadastros incluem e editam em abas sobre a lista (como as receitas), com confirmação ao fechar
+  com alteração não gravada.
+- Painel Geral com indicadores: receitas no dia, semana, mês e ano comparadas com o mesmo trecho
+  do período anterior, receitas por dia do mês e os 10 produtos mais receitados no ano.
+- Rodapé mostra a identificação do servidor; quadro do servidor saiu do cabeçalho.
+
 ### 0.0.2
 - Receita aberta em abas sobre a lista, em 3 etapas (dados iniciais, produtos, recomendações e
   observações) com Voltar / Avançar; na inclusão, cabeçalho e produtos são gravados juntos só no

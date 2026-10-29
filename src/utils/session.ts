@@ -1,8 +1,7 @@
 import { Empresa, ServidorInfo, Usuario } from '../types';
 
 const SESSAO = 'receitaweb_sessao';
-const LEMBRETE = 'receitaweb_lembrar_email';
-const SERVIDOR = 'receitaweb_ultimo_servidor';
+const TOKEN = 'receitaweb_token';
 
 export interface SessaoSalva {
   token: string;
@@ -48,18 +47,9 @@ export function limparSessao() {
   }, undefined);
 }
 
-export function lerLembrete(): string | null {
-  return seguro(() => localStorage.getItem(LEMBRETE), null);
+export function lerTokenLembrado(): string {
+  return seguro(() => localStorage.getItem(TOKEN) || '', '');
 }
-export function salvarLembrete(email: string) {
-  seguro(() => localStorage.setItem(LEMBRETE, email), undefined);
-}
-export function limparLembrete() {
-  seguro(() => localStorage.removeItem(LEMBRETE), undefined);
-}
-export function lerUltimoServidor(): string {
-  return seguro(() => localStorage.getItem(SERVIDOR) || '', '');
-}
-export function salvarUltimoServidor(numero: number) {
-  seguro(() => localStorage.setItem(SERVIDOR, String(numero)), undefined);
+export function lembrarToken(token: string | null) {
+  seguro(() => (token ? localStorage.setItem(TOKEN, token) : localStorage.removeItem(TOKEN)), undefined);
 }

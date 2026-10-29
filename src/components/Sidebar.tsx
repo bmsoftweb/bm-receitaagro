@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="min-w-0">
             <h1 className="text-sm font-bold text-stone-900 dark:text-white leading-tight truncate">
-              Receita<span className="text-amber-500 dark:text-amber-400 font-extrabold">Web</span>
+              BM-Receita<span className="text-amber-500 dark:text-amber-400 font-extrabold">Agro</span>
             </h1>
             <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">Receituário Agronômico</p>
           </div>

@@ -8,6 +8,47 @@
 @theme {
   --font-sans: "Jost", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
+
+  /* Paleta do app: as classes amber/emerald/stone já usadas nas telas passam a
+     ter estes tons. Base: #4B5E53 (verde-escuro), #8FA48B (sálvia),
+     #D7DCCB (sálvia-claro), #F2EFE7 (creme), #B08669 (terracota). */
+  --color-amber-50: #f1f4f0;
+  --color-amber-100: #dfe6de;
+  --color-amber-200: #c2cfc0;
+  --color-amber-300: #9eb09b;
+  --color-amber-400: #7a917a;
+  --color-amber-500: #5e7663;
+  --color-amber-600: #4b5e53;
+  --color-amber-700: #3f4f46;
+  --color-amber-800: #34413a;
+  --color-amber-900: #2b3530;
+  --color-amber-950: #19201c;
+
+  --color-emerald-50: #f2f5f1;
+  --color-emerald-100: #e2e9e0;
+  --color-emerald-200: #c9d5c6;
+  --color-emerald-300: #abbda8;
+  --color-emerald-400: #8fa48b;
+  --color-emerald-500: #7a9176;
+  --color-emerald-600: #64795f;
+  --color-emerald-700: #50614d;
+  --color-emerald-800: #404e3e;
+  --color-emerald-900: #343f33;
+  --color-emerald-950: #1c231b;
+
+  --color-stone-50: #f7f5ef;
+  --color-stone-100: #f2efe7;
+  --color-stone-200: #e3e3d6;
+  --color-stone-300: #d7dccb;
+  --color-stone-400: #a3a99a;
+  --color-stone-500: #7d8376;
+  --color-stone-600: #61675c;
+  --color-stone-700: #4a4f46;
+  --color-stone-800: #33372f;
+  --color-stone-900: #23261f;
+  --color-stone-950: #161813;
+
+  --color-terracota: #b08669;
 }
 
 :root {
@@ -31,16 +72,16 @@ html, body {
    CAMPOS DE ENTRADA (padrão visual global)
    ==========================================
    Campos de digitação não têm moldura, só uma barra de 2px na borda esquerda
-   indicando se o campo é obrigatório (âmbar) ou opcional (verde). */
+   indicando se o campo é obrigatório (terracota) ou opcional (sálvia). */
 :where(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"])) {
   border: 0 solid transparent !important;
   border-left-width: 2px !important;
-  border-left-color: #10b981 !important; /* emerald-500 – campo opcional */
+  border-left-color: var(--color-emerald-400) !important; /* sálvia – campo opcional */
   border-radius: 0 !important;
 }
 
 :where(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"])):where(:required) {
-  border-left-color: #f59e0b !important; /* amber-500 – campo obrigatório */
+  border-left-color: var(--color-terracota) !important; /* terracota – campo obrigatório */
 }
 
 /* Campo em foco: nenhuma moldura/anel, só o fundo um pouco mais escuro (camada

@@ -255,6 +255,54 @@ export function createReceitasRouter() {
     res.json({ truncated: rows.length > 500, receitas: rows.slice(0, 500).map(mapearReceita) });
   }));
 
+  // ======================= Painel geral =======================
+  // Cada período vai do início até hoje e compara com o mesmo trecho do período anterior
+  r.get('/receitas/painel', rota(async (_req, res) => {
+    const hoje = hojeISO();
+    const somar = (iso: string, dias: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
+    /** Mesmo dia em outro mês/ano, limitado ao último dia (31/03 → 28/02) */
+    const mesmoDia = (ano: number, mes: number, dia: number) => {
+      const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+      return `${ano}-${String(mes).padStart(2, '0')}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`;
+    };
+    const [ano, mes, dia] = hoje.split('-').map(Number);
+    const segunda = somar(hoje, -((new Date(`${hoje}T12:00:00Z`).getUTCDay() + 6) % 7));
+    const [anoAnt, mesAnt] = mes === 1 ? [ano - 1, 12] : [ano, mes - 1];
+    const periodos = {
+      dia: [[hoje, hoje], [somar(hoje, -1), somar(hoje, -1)]],
+      semana: [[segunda, hoje], [somar(segunda, -7), somar(hoje, -7)]],
+      mes: [[mesmoDia(ano, mes, 1), hoje], [mesmoDia(anoAnt, mesAnt, 1), mesmoDia(anoAnt, mesAnt, dia)]],
+      ano: [[`${ano}-01-01`, hoje], [`${ano - 1}-01-01`, mesmoDia(ano - 1, mes, dia)]],
+    };
+
+    const ativas = "(A.CANCELADO IS NULL OR A.CANCELADO <> 'S')";
+    const [porDia, produtos] = await Promise.all([
+      consultar(`SELECT A.DATA d, COUNT(*) q FROM REC_RECEITAS A WHERE A.DATA >= ${sqlData(`${ano - 1}-01-01`)} AND ${ativas} GROUP BY A.DATA`),
+      consultar(
+        `SELECT P.ID_NOVOREC id, D.NOME nome, COUNT(*) q
+           FROM REC_RECEITAS_PRO P
+          INNER JOIN REC_RECEITAS A ON A.ID = P.ID_RECEITA
+           LEFT JOIN REC_NOVOREC_DEFENSIVOS D ON D.ID = P.ID_NOVOREC
+          WHERE A.DATA >= ${sqlData(`${ano}-01-01`)} AND ${ativas}
+          GROUP BY P.ID_NOVOREC, D.NOME
+          ORDER BY q DESC TOP 10`,
+      ),
+    ]);
+    const qtd = new Map(porDia.map((x) => [s(x.d).slice(0, 10), n(x.q)]));
+    const contar = ([ini, fim]: string[]) => [...qtd].reduce((t, [d, q]) => (d >= ini && d <= fim ? t + q : t), 0);
+    const diasNoMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+
+    res.json({
+      hoje,
+      cards: Object.fromEntries(Object.entries(periodos).map(([k, [atual, anterior]]) => [k, { atual: contar(atual), anterior: contar(anterior), periodo: atual, periodoAnterior: anterior }])),
+      diasMes: Array.from({ length: diasNoMes }, (_, i) => {
+        const d = mesmoDia(ano, mes, i + 1);
+        return { data: d, atual: qtd.get(d) || 0, anterior: i + 1 <= new Date(Date.UTC(anoAnt, mesAnt, 0)).getUTCDate() ? qtd.get(mesmoDia(anoAnt, mesAnt, i + 1)) || 0 : null };
+      }),
+      produtos: produtos.map((x) => ({ id: n(x.id), nome: s(x.nome) || `Produto ${n(x.id)}`, quantidade: n(x.q) })),
+    });
+  }));
+
   r.get('/receitas/:id', rota(async (req, res) => {
     const id = idParam(req);
     res.json({ ...mapearReceita(await carregarReceita(id)), produtos: await produtosDaReceita(id) });

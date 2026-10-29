@@ -24,6 +24,7 @@ interface Profissional {
 export const ProfissionaisView: React.FC = () => (
   <Cadastro<Profissional>
     nome="profissional"
+    titulo="Profissionais"
     tamanho="lg"
     carregar={(q) => get(`/api/profissionais${qs({ q })}`)}
     descrever={(p) => p.nome}
@@ -77,6 +78,7 @@ export const ArtsView: React.FC = () => {
   return (
     <Cadastro<Art>
       nome="ART/TRT"
+      titulo="ARTs/TRTs" feminino
       carregar={(q) => get(`/api/arts${qs({ q })}`)}
       descrever={(a) => `ART ${a.numero}`}
       colunas={[
@@ -112,6 +114,7 @@ interface Texto { id: number; texto: string }
 export const ObservacoesView: React.FC = () => (
   <Cadastro<Texto>
     nome="observação"
+    titulo="Observações" feminino
     filtroLocal
     carregar={() => get('/api/observacoes')}
     descrever={(o) => o.texto}
@@ -126,6 +129,7 @@ export const ObservacoesView: React.FC = () => (
 export const DiagnosticosView: React.FC = () => (
   <Cadastro<Texto>
     nome="diagnóstico"
+    titulo="Diagnósticos"
     filtroLocal
     carregar={() => get('/api/diagnosticos')}
     descrever={(d) => d.texto.slice(0, 60)}
@@ -153,6 +157,7 @@ export const ClientesView: React.FC = () => {
   return (
     <Cadastro<Cliente & { pj?: boolean }>
       nome="cliente"
+      titulo="Clientes"
       tamanho="lg"
       chaveRecarga={String(ativos)}
       somenteLeitura={usaBmsoft ? 'Clientes são mantidos no BMsoft: aqui só consulta.' : null}
@@ -247,6 +252,7 @@ const CompendioView: React.FC<{ tipo: 'culturas' | 'pragas' }> = ({ tipo }) => (
   <Cadastro<ItemCompendio>
     key={tipo}
     nome={tipo === 'culturas' ? 'cultura' : 'praga'}
+    titulo={tipo === 'culturas' ? 'Culturas' : 'Pragas'} feminino
     podeIncluir={false}
     carregar={async (q) => (await get<{ itens: ItemCompendio[] }>(`/api/${tipo}${qs({ q })}`)).itens}
     descrever={(c) => c.nome}

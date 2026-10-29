@@ -151,10 +151,10 @@ export const App: React.FC = () => {
             <footer className="bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800 text-stone-500 text-xs py-4 px-4">
               <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <strong>Receita<span className="text-amber-500">Web</span></strong> • Receituário Agronômico
+                  <strong>BM-Receita<span className="text-amber-500">Agro</span></strong> • Receituário Agronômico
                 </div>
                 <div className="flex items-center gap-4">
-                  <span>Servidor #{sessao.servidor.numero}</span>
+                  <span>Servidor: {sessao.servidor.identificacao}</span>
                   <span>•</span>
                   <span>Integração via bmAPI</span>
                   <span>•</span>

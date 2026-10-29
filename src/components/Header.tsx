@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Building2, Database, RefreshCw, Lock } from 'lucide-react';
+import { Menu, Building2, RefreshCw, Lock } from 'lucide-react';
 import { Empresa, ServidorInfo, DbConnectionStatus } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -58,32 +58,6 @@ export const Header: React.FC<HeaderProps> = ({
                 {empresa.nome}
               </div>
               <div className="text-[10px] text-stone-400 font-mono">{empresa.cnpj}</div>
-            </div>
-          </div>
-
-          {/* Status da conexão com a bmAPI */}
-          <div
-            title={
-              dbStatus?.connected
-                ? `Servidor #${servidor.numero} • ${servidor.identificacao || 'bmAPI'} • ${dbStatus.latencyMs}ms`
-                : dbStatus?.error || 'Verificando conexão com o servidor...'
-            }
-            className="hidden md:flex items-center gap-2 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700/80 rounded-xl px-3 py-1.5"
-          >
-            <Database
-              className={`w-3.5 h-3.5 ${dbStatus?.connected ? 'text-emerald-500' : 'text-rose-500 animate-pulse'}`}
-            />
-            <div className="text-right">
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 font-medium">
-                Servidor #{servidor.numero}
-              </div>
-              <div
-                className={`text-xs font-bold font-mono ${
-                  dbStatus?.connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                }`}
-              >
-                {dbStatus?.connected ? `${dbStatus.latencyMs}ms` : 'Offline'}
-              </div>
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { Router, Request, Response, NextFunction } from 'express';
 import { config } from './config.js';
 import { consultarUm, executar, comServidor, servidorAtual, verificarBmapi, BmapiError } from './bmapi.js';
-import { buscarServidor, Servidor } from './servidores.js';
+import { buscarServidor, buscarServidorPorToken, Servidor } from './servidores.js';
 
 /**
  * Autenticação do ReceitaWeb.
@@ -160,14 +160,6 @@ async function carregarUsuario(id: number): Promise<UsuarioSessao | null> {
   return usuario;
 }
 
-function numeroServidor(valor: unknown): number {
-  const n = Number(String(valor ?? '').trim());
-  if (!Number.isInteger(n) || n < 1 || n > 999) {
-    throw new BmapiError('Informe o número do servidor (1 a 999).');
-  }
-  return n;
-}
-
 async function resolverServidor(numero: number): Promise<Servidor> {
   let servidor: Servidor | null;
   try {
@@ -176,6 +168,18 @@ async function resolverServidor(numero: number): Promise<Servidor> {
     throw new BmapiError(`Não foi possível consultar o cadastro de servidores (${err.code || err.message}).`, 503);
   }
   if (!servidor) throw new BmapiError(`Servidor ${numero} não encontrado.`, 404);
+  return servidor;
+}
+
+async function servidorDoToken(token: unknown): Promise<Servidor> {
+  if (!String(token ?? '').trim()) throw new BmapiError('Informe o token.');
+  let servidor: Servidor | null;
+  try {
+    servidor = await buscarServidorPorToken(String(token));
+  } catch (err: any) {
+    throw new BmapiError(`Não foi possível consultar o cadastro de servidores (${err.code || err.message}).`, 503);
+  }
+  if (!servidor) throw new BmapiError('Token não encontrado.', 404);
   return servidor;
 }
 
@@ -251,9 +255,10 @@ async function dadosEmpresa() {
 export function createAuthRouter() {
   const router = Router();
 
-  router.get('/servidores/:numero', async (req: Request, res: Response) => {
+  // POST para o token não ir na URL (logs de acesso)
+  router.post('/servidores/verificar', async (req: Request, res: Response) => {
     try {
-      const servidor = await resolverServidor(numeroServidor(req.params.numero));
+      const servidor = await servidorDoToken(req.body?.token);
       const status = await comServidor(servidor, () => verificarBmapi());
       res.json({ ...dadosPublicosServidor(servidor), connected: status.connected, nomeEmpresa: status.nomeEmpresa ?? null, error: status.error });
     } catch (err: any) {
@@ -263,11 +268,10 @@ export function createAuthRouter() {
 
   router.post('/auth/login', async (req: Request, res: Response) => {
     try {
-      const numero = numeroServidor(req.body?.servidor ?? 1);
       const email = String(req.body?.email || '').trim();
       const senha = String(req.body?.senha ?? '');
 
-      const servidor = await resolverServidor(numero);
+      const servidor = await servidorDoToken(req.body?.token);
 
       await comServidor(servidor, async () => {
         let usuario: UsuarioSessao | null = null;

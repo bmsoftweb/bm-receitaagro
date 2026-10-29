@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, RefreshCw, Loader2, Save, ChevronRight, Lock, Inbox, MapPin,
-  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, List, FileText, FilePlus2, X,
+  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink,
 } from 'lucide-react';
 import { get, send, qs } from '../services/api';
 import { Opcao, Receita, ProdutoReceita, Tratamento } from '../types';
@@ -20,6 +20,7 @@ import { DateField } from './DateField';
 import { Toggle } from './Toggle';
 import { Pesquisa } from './Pesquisa';
 import { BotaoAcao } from './MenuAcoes';
+import { BarraAbas } from './BarraAbas';
 import {
   calcularQuantidade, calcularArea, doseValida, textoAplicacoes, tiposAplicacaoLiberados, acertaUnidade,
 } from '../../shared/receita';
@@ -900,33 +901,10 @@ export const ReceitasView: React.FC = () => {
     setAbas((prev) => prev.map((a) => (a.uid === uid && (a.id !== r.id || a.titulo !== titulo) ? { ...a, id: r.id, titulo } : a)));
   };
 
-  const abaClasse = (ativa: boolean) =>
-    `flex items-center gap-1.5 border-r border-stone-200 dark:border-stone-800 border-b-2 transition-colors ${ativa ? 'bg-white dark:bg-stone-900 border-b-amber-600' : 'border-b-transparent hover:bg-stone-200/60 dark:hover:bg-stone-800/60'}`;
-  const abaTexto = (ativa: boolean) =>
-    `flex items-center gap-2 py-2.5 text-xs font-semibold whitespace-nowrap cursor-pointer ${ativa ? 'text-amber-700 dark:text-amber-400' : 'text-stone-600 dark:text-stone-400'}`;
-
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* Barra de abas só aparece com alguma receita aberta */}
-      {abas.length > 0 && (
-        <div className="flex items-stretch bg-stone-100 dark:bg-stone-950 border-b border-stone-200 dark:border-stone-800 overflow-x-auto overflow-y-hidden shrink-0">
-          <div className={`${abaClasse(abaAtiva === 0)} px-4`}>
-            <button type="button" onClick={() => setAbaAtiva(0)} className={abaTexto(abaAtiva === 0)}>
-              <List className="w-3.5 h-3.5" /><span>Receitas</span><span className="text-[10px] font-mono text-stone-400">{lista.length}</span>
-            </button>
-          </div>
-          {abas.map((a) => (
-            <div key={a.uid} className={`${abaClasse(abaAtiva === a.uid)} pl-4 pr-2`}>
-              <button type="button" onClick={() => setAbaAtiva(a.uid)} className={abaTexto(abaAtiva === a.uid)}>
-                {a.id ? <FileText className="w-3.5 h-3.5" /> : <FilePlus2 className="w-3.5 h-3.5" />}<span>{a.titulo}</span>
-              </button>
-              <button type="button" onClick={() => fechar(a.uid)} title="Fechar aba" className="p-1 rounded text-stone-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition-colors cursor-pointer shrink-0">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <BarraAbas rotulo="Receitas" total={lista.length} abas={abas.map((a) => ({ uid: a.uid, titulo: a.titulo, novo: !a.id }))}
+        ativa={abaAtiva} onAtivar={setAbaAtiva} onFechar={fechar} />
 
       {/* Abas ficam montadas (escondidas) para não perder o que está sendo digitado */}
       {apoio && abas.map((a) => (

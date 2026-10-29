@@ -6,7 +6,7 @@ import {
   PAINEL, BARRA, BARRA_INFO, BTN_PRIMARIO, BTN_SECUNDARIO, GRADE_AREA, TABELA, TH, TH_INDICADOR,
   TH_ACOES, TR, TD, TD_INDICADOR, TD_ACOES, INDICADOR, TD_VAZIO,
 } from '../utils/listaStyles';
-import { Modal } from './Modal';
+import { BarraAbas } from './BarraAbas';
 import { AvisoErro } from './AvisoErro';
 import { toast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
@@ -16,7 +16,7 @@ import { BotaoAcao, MenuAcoes, SeparadorAcoes } from './MenuAcoes';
 import { Opcao } from '../types';
 
 /**
- * Tela de cadastro padrão (lista + formulário em modal + exclusão com confirmação).
+ * Tela de cadastro padrão (lista + formulário em abas, modelo do crmWeb + exclusão com confirmação).
  * Profissionais, ARTs, observações, diagnósticos, clientes, culturas e pragas usam esta tela.
  */
 
@@ -53,6 +53,10 @@ export interface AcaoExtra<T> {
 interface Props<T extends { id: number }> {
   /** Nome no singular, minúsculo: "profissional" */
   nome: string;
+  /** Rótulo da aba da lista: "Profissionais" */
+  titulo: string;
+  /** "Nova observação", "incluída" */
+  feminino?: boolean;
   carregar: (q: string) => Promise<T[]>;
   colunas: Coluna<T>[];
   campos: Campo<T>[];
@@ -63,6 +67,7 @@ interface Props<T extends { id: number }> {
   acoes?: AcaoExtra<T>[];
   /** Texto exibido quando a tela não permite incluir/alterar (ex.: clientes mantidos no BMsoft) */
   somenteLeitura?: string | null;
+  /** Largura máxima do formulário na aba */
   tamanho?: 'sm' | 'md' | 'lg' | 'xl';
   /** Campos extras do formulário (pesquisa CIDASC etc.) */
   extraFormulario?: (item: Partial<T>, alterar: (p: Partial<T>) => void) => React.ReactNode;
@@ -75,16 +80,29 @@ interface Props<T extends { id: number }> {
   podeIncluir?: boolean;
 }
 
+/** Registro aberto numa aba; `base` é o JSON ao abrir, para saber se foi alterado */
+interface Aba<T> {
+  uid: number;
+  item: Partial<T>;
+  base: string;
+  erro: string | null;
+  salvando: boolean;
+}
+
+const LARGURA = { sm: 'max-w-md', md: 'max-w-2xl', lg: 'max-w-4xl', xl: 'max-w-6xl' };
+
 export function Cadastro<T extends { id: number }>(p: Props<T>) {
   const [lista, setLista] = useState<T[]>([]);
   const [busca, setBusca] = useState('');
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [editando, setEditando] = useState<Partial<T> | null>(null);
-  const [salvando, setSalvando] = useState(false);
+  const [abas, setAbas] = useState<Aba<T>[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState(0);
+  const [fechando, setFechando] = useState<number | null>(null);
+  const focar = useRef(0);
   const [excluindo, setExcluindo] = useState<T | null>(null);
   const [processando, setProcessando] = useState(false);
-  const form = useRef<HTMLFormElement>(null);
+  const areaAbas = useRef<HTMLDivElement>(null);
 
   const avisar = toast;
 
@@ -107,31 +125,52 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.filtroLocal ? '' : busca, p.chaveRecarga]);
 
-  // Foco no primeiro campo vazio (inclusão) ou no primeiro campo (edição)
-  useEffect(() => {
-    if (!editando) return;
-    const t = setTimeout(() => {
-      const els = [...(form.current?.querySelectorAll<HTMLInputElement>('input:not([type=checkbox]):not([disabled]), select, textarea') || [])];
-      (editando.id ? els[0] : els.find((e) => !e.value) || els[0])?.focus();
-    }, 50);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editando?.id, editando === null]);
+  /** Abre o registro (ou a inclusão) numa aba; se já estiver aberto, só ativa */
+  const abrir = (item: Partial<T>) => {
+    const existente = abas.find((a) => (item.id ? a.item.id === item.id : !a.item.id));
+    if (existente) return setAbaAtiva(existente.uid);
+    const uid = Date.now();
+    focar.current = uid;
+    setAbas([...abas, { uid, item, base: JSON.stringify(item), erro: null, salvando: false }]);
+    setAbaAtiva(uid);
+  };
 
-  const salvar = async (e: React.FormEvent) => {
+  const mudarAba = (uid: number, parcial: Partial<Aba<T>>) =>
+    setAbas((prev) => prev.map((a) => (a.uid === uid ? { ...a, ...parcial } : a)));
+
+  const fecharJa = (uid: number) => {
+    setFechando(null);
+    const i = abas.findIndex((a) => a.uid === uid);
+    const restantes = abas.filter((a) => a.uid !== uid);
+    setAbas(restantes);
+    // Fechando a ativa, vai para a vizinha à esquerda (ou a lista)
+    if (abaAtiva === uid) setAbaAtiva(restantes[Math.max(0, i - 1)]?.uid ?? 0);
+  };
+
+  const fechar = (uid: number) => {
+    const a = abas.find((x) => x.uid === uid);
+    return a && JSON.stringify(a.item) !== a.base ? setFechando(uid) : fecharJa(uid);
+  };
+
+  // Aba recém-aberta: foco no primeiro campo vazio (inclusão) ou no primeiro campo (edição)
+  useEffect(() => {
+    if (!focar.current || focar.current !== abaAtiva) return;
+    focar.current = 0;
+    const aba = abas.find((a) => a.uid === abaAtiva);
+    const els = [...(areaAbas.current?.querySelectorAll<HTMLInputElement>(`[data-aba="${abaAtiva}"] :is(input:not([type=checkbox]):not([disabled]), select, textarea)`) || [])];
+    (aba?.item.id ? els[0] : els.find((e) => !e.value) || els[0])?.focus();
+  }, [abaAtiva, abas]);
+
+  const salvar = async (aba: Aba<T>, e: React.FormEvent) => {
     e.preventDefault();
-    if (!editando) return;
     try {
-      setSalvando(true);
-      setErro(null);
-      await p.salvar(editando);
-      avisar(`${p.nome[0].toUpperCase()}${p.nome.slice(1)} ${editando.id ? 'atualizado' : 'incluído'} com sucesso.`);
-      setEditando(null);
+      mudarAba(aba.uid, { salvando: true, erro: null });
+      await p.salvar(aba.item);
+      avisar(`${p.nome[0].toUpperCase()}${p.nome.slice(1)} ${aba.item.id ? 'atualizad' : 'incluíd'}${p.feminino ? 'a' : 'o'} com sucesso.`);
+      fecharJa(aba.uid);
       carregar();
     } catch (err: any) {
-      setErro(err.message);
-    } finally {
-      setSalvando(false);
+      mudarAba(aba.uid, { salvando: false, erro: err.message });
     }
   };
 
@@ -175,17 +214,18 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         <BotaoAcao key={a.titulo} icone={a.icone} titulo={a.titulo} descricao={a.descricao} tom={a.tom} onClick={() => executarAcao(a, t)} />
       ))}
       {p.acoes?.length ? <SeparadorAcoes /> : null}
-      {podeEditar && <BotaoAcao icone={Pencil} titulo="Editar" descricao={`alterar ${p.nome}`} onClick={() => setEditando({ ...t })} />}
+      {podeEditar && <BotaoAcao icone={Pencil} titulo="Editar" descricao={`alterar ${p.nome}`} onClick={() => abrir({ ...t })} />}
       {podeEditar && p.excluir && <BotaoAcao icone={Trash2} titulo="Excluir" descricao={`excluir ${p.nome}`} tom="perigo" onClick={() => setExcluindo(t)} />}
     </>
   );
 
-  const alterar = (parcial: Partial<T>) => setEditando((e) => ({ ...e, ...parcial }));
+  const alterarItem = (uid: number, parcial: Partial<T>) =>
+    setAbas((prev) => prev.map((a) => (a.uid === uid ? { ...a, item: { ...a.item, ...parcial } } : a)));
 
-  const renderCampo = (c: Campo<T>) => {
-    const v: any = (editando as any)?.[c.chave];
+  const renderCampo = (aba: Aba<T>, c: Campo<T>) => {
+    const v: any = (aba.item as any)[c.chave];
     const span = { 1: 'sm:col-span-1', 2: 'sm:col-span-2', 3: 'sm:col-span-3', 4: 'sm:col-span-4' }[c.largura || 4];
-    const set = (valor: unknown) => alterar({ [c.chave]: valor } as Partial<T>);
+    const set = (valor: unknown) => alterarItem(aba.uid, { [c.chave]: valor } as Partial<T>);
     let input: React.ReactNode;
     switch (c.tipo) {
       case 'toggle':
@@ -240,8 +280,42 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
     );
   };
 
+  const novoNome = `${p.feminino ? 'Nova' : 'Novo'} ${p.nome}`;
+  const tituloAba = (item: Partial<T>) => (item.id ? p.descrever(item as T) || `${p.nome} #${item.id}` : novoNome);
+
   return (
-    <div className={PAINEL}>
+    <div className="flex-1 flex flex-col min-h-0">
+      <BarraAbas rotulo={p.titulo} total={filtrados.length}
+        abas={abas.map((a) => ({ uid: a.uid, titulo: tituloAba(a.item), novo: !a.item.id }))}
+        ativa={abaAtiva} onAtivar={setAbaAtiva} onFechar={fechar} />
+
+      {/* Abas ficam montadas (escondidas) para não perder o que está sendo digitado */}
+      <div ref={areaAbas} className="contents">
+        {abas.map((a) => (
+          <form key={a.uid} data-aba={a.uid} onSubmit={(e) => salvar(a, e)} className={abaAtiva === a.uid ? PAINEL : 'hidden'}>
+            <div className={BARRA}>
+              <h3 className="text-sm font-bold truncate">{a.item.id ? `Editar ${p.nome}` : novoNome}</h3>
+            </div>
+            <div className="flex-1 overflow-auto min-h-0 p-4">
+              <div className={`${LARGURA[p.tamanho || 'md']} space-y-4`}>
+                {a.erro && <AvisoErro mensagem={a.erro} onFechar={() => mudarAba(a.uid, { erro: null })} />}
+                <div className="grid grid-cols-4 gap-3">{p.campos.map((c) => renderCampo(a, c))}</div>
+                {p.extraFormulario?.(a.item, (parcial) => alterarItem(a.uid, parcial))}
+              </div>
+            </div>
+            <div className="px-4 py-2.5 border-t border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-950/40 flex items-center gap-2 shrink-0">
+              <button type="button" onClick={() => fechar(a.uid)} className={BTN_SECUNDARIO}>Fechar</button>
+              <div className="flex-1" />
+              <button type="submit" disabled={a.salvando} className={BTN_PRIMARIO}>
+                {a.salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                <span>Gravar</span>
+              </button>
+            </div>
+          </form>
+        ))}
+      </div>
+
+    <div className={abaAtiva === 0 ? PAINEL : 'hidden'}>
       <div className={BARRA}>
         <div className={BARRA_INFO}>{loading ? 'Carregando…' : `${filtrados.length} registro(s)`}</div>
         <div className="flex items-center gap-2.5 shrink-0">
@@ -254,7 +328,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
           {podeEditar && p.podeIncluir !== false && (
-            <button type="button" onClick={() => setEditando(p.novo())} className={BTN_PRIMARIO}>
+            <button type="button" onClick={() => abrir(p.novo())} className={BTN_PRIMARIO}>
               <Plus className="w-3.5 h-3.5" />
               <span>Novo</span>
             </button>
@@ -266,7 +340,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         <span title={p.somenteLeitura} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-900">
           <Lock className="w-3 h-3" /> Somente Leitura
         </span>, seloTitulo)}
-      {erro && !editando && <AvisoErro mensagem={erro} onFechar={() => setErro(null)} className="mx-4 mt-3 shrink-0" />}
+      {erro && <AvisoErro mensagem={erro} onFechar={() => setErro(null)} className="mx-4 mt-3 shrink-0" />}
 
       <div className={GRADE_AREA}>
         <table className={TABELA}>
@@ -290,7 +364,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
               </tr>
             ) : (
               filtrados.map((t) => (
-                <tr key={t.id} className={TR} onDoubleClick={() => podeEditar && setEditando({ ...t })}>
+                <tr key={t.id} className={TR} onDoubleClick={() => podeEditar && abrir({ ...t })}>
                   <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
                   {p.colunas.map((c) => <td key={c.titulo} className={`${TD} ${c.classe || ''}`}>{c.valor(t)}</td>)}
                   {totalAcoes > 0 && (
@@ -305,23 +379,17 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         </table>
       </div>
 
-      {editando && (
-        <Modal isOpen onClose={() => setEditando(null)} title={`${editando.id ? 'Editar' : 'Novo'} ${p.nome}`} size={p.tamanho || 'md'}>
-          <form ref={form} onSubmit={salvar} className="space-y-4">
-            {erro && <AvisoErro mensagem={erro} onFechar={() => setErro(null)} />}
-            <div className="grid grid-cols-4 gap-3">{p.campos.map(renderCampo)}</div>
-            {p.extraFormulario?.(editando, alterar)}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">
-              <button type="button" onClick={() => setEditando(null)} className={BTN_SECUNDARIO}>Cancelar</button>
-              <button type="submit" disabled={salvando} className={BTN_PRIMARIO}>
-                {salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Salvar</span>
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+    </div>
 
+      {fechando !== null && (
+        <ConfirmModal
+          titulo="Descartar alterações"
+          mensagem={<>A aba <strong>{tituloAba(abas.find((a) => a.uid === fechando)?.item || {})}</strong> tem alterações não gravadas. Fechar a aba e descartar?</>}
+          textoConfirmar="Descartar"
+          onConfirmar={() => fecharJa(fechando)}
+          onCancelar={() => setFechando(null)}
+        />
+      )}
       {excluindo && (
         <ConfirmModal
           titulo={`Excluir ${p.nome}`}

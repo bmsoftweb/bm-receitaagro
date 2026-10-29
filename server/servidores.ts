@@ -4,7 +4,7 @@ import { config } from './config.js';
 /**
  * Cadastro dos servidores da bmAPI (MySQL bmapi.servidores).
  *
- * O número digitado no login é o id da tabela; a linha informa a URL, a porta e o
+ * O login localiza a linha pelo token digitado; a linha informa a URL, a porta e o
  * token (X-API-Key) da bmAPI daquele cliente. O token nunca sai do servidor Node.
  */
 
@@ -82,4 +82,12 @@ export async function buscarServidor(numero: number): Promise<Servidor | null> {
 
   cache.set(numero, { servidor, ate: Date.now() + CACHE_MS });
   return servidor;
+}
+
+/** Login: o cliente digita o token da bmAPI; a sessão guarda só o id do servidor */
+export async function buscarServidorPorToken(token: string): Promise<Servidor | null> {
+  const t = String(token || '').trim();
+  if (!t || t.length > 255) return null;
+  const [rows] = await pool.query<any[]>('SELECT id FROM servidores WHERE token = ? LIMIT 1', [t]);
+  return rows[0] ? buscarServidor(Number(rows[0].id)) : null;
 }
