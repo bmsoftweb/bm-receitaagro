@@ -46,8 +46,6 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Não convertido
 
-- Transmissão à CIDASC (`receita_e.exe`, sem fonte): o número CIDASC continua sendo gravado
-  pelo programa externo; com `EXIGE_CIDASC_IMPRESSAO=S` a impressão espera por ele.
 - Assinatura digital com PFX (Chilkat), envio do PDF por FTP e QR code: a impressão é pelo
   navegador e mostra a chave do PDF em texto.
 - Impressão matricial, sincronização SIGEN/CIDASC (TfrmAtualizar), Zerar Estoque e Gerar
@@ -56,6 +54,16 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
   ainda protegidas por senha (`REC_CULTURAS_PRAGAS_PRODUTOS`, `REC_UFS_RESTRICOES` e afins).
 
 ## Histórico
+
+### 0.0.4
+- Envio e cancelamento da receita no SIGEN da CIDASC dentro do app (antes o `receita_e.exe`),
+  pelas ações da lista e automaticamente na impressão com `EXIGE_CIDASC_IMPRESSAO=S`.
+- Ação Clonar na lista de receitas: abre uma nova receita com os dados e produtos da escolhida;
+  o número só sai no Gravar. Coluna Ações com todos os ícones soltos.
+- Tela Configurações (REC_CONFIG): ambiente do SIGEN, praga genérica, token do Novo Receituário
+  e opções de integração, no padrão do crmWeb.
+- Listas com mais de 10 opções viram campo com pesquisa; opções do select no modo escuro.
+- Login: rótulo "Token API"; erro do token do Novo Receituário mostra o retorno da API.
 
 ### 0.0.3
 - Login pelo token do servidor (bmapi.servidores.token) no lugar do número; sem usuário e senha.

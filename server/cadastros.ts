@@ -403,7 +403,21 @@ export function createCadastrosRouter() {
 
   r.get('/rec-config', rota(async (_req: Request, res: Response) => {
     const { tokenNovoRec, ...publico } = await lerRecConfig();
-    res.json({ ...publico, temTokenNovoRec: Boolean(tokenNovoRec) });
+    res.json({ ...publico, temTokenNovoRec: Boolean(tokenNovoRec), exigeCidascParaImprimir: config.exigeCidascParaImprimir });
+  }));
+
+  /** Tela Configurações: REC_CONFIG tem uma linha só; token vazio mantém o atual */
+  r.put('/rec-config', rota(async (req: Request, res: Response) => {
+    const b = req.body || {};
+    const sn = (v: any) => sqlTexto(v ? 'S' : 'N');
+    const url = texto(b.urlWs, 200);
+    if (url && !/^https:\/\/[\w.-]+(\/\S*)?$/.test(url)) throw new BmapiError('URL do SIGEN inválida.', 400);
+    const token = texto(b.tokenNovoRec, 200);
+    await executar(`UPDATE REC_CONFIG SET URL_WS = ${sqlTexto(url)},
+      ID_PRAGA_GENERICA_CIDASC = ${sqlInteiro(Number(b.idPragaGenericaCidasc) || 0)},
+      USA_BMSOFT = ${sn(b.usaBmsoft)}, USA_SISTEMAS_TERCEIROS = ${sn(b.usaSistemasTerceiros)},
+      COMPENDIO_ONLINE = ${sn(b.compendioOnline)}${token ? `, TOKENID_NOVOREC = ${sqlTexto(token)}` : ''}`);
+    res.json({ ok: true });
   }));
 
   return r;

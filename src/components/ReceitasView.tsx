@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, RefreshCw, Loader2, Save, ChevronRight, Lock, Inbox, MapPin,
-  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink,
+  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy,
 } from 'lucide-react';
 import { get, send, qs } from '../services/api';
 import { Opcao, Receita, ProdutoReceita, Tratamento } from '../types';
@@ -18,6 +18,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { NumberField } from './NumberField';
 import { DateField } from './DateField';
 import { Toggle } from './Toggle';
+import { Selecao } from './Selecao';
 import { Pesquisa } from './Pesquisa';
 import { BotaoAcao } from './MenuAcoes';
 import { BarraAbas } from './BarraAbas';
@@ -310,10 +311,10 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
               <div className={FIELD_WRAPPER_CLASS}><NumberField scale={4} required value={f.dose} onChange={(v) => setF({ ...f, dose: Number(v) || 0 })} className={`${INPUT_CLASS} text-right ${doseOk ? '' : 'text-rose-600'}`} /></div>
             </Campo>
             <Campo rotulo="UN da dose (CIDASC)" className="col-span-2 sm:col-span-1">
-              <select required value={f.idUnDose} onChange={(e) => setF({ ...f, idUnDose: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+              <Selecao required value={f.idUnDose} onChange={(e) => setF({ ...f, idUnDose: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
                 <option value={0}>Selecione…</option>
                 {apoio.unDerivadas.map((u) => <option key={u.id} value={u.id}>{u.un} – {u.descricao}</option>)}
-              </select>
+              </Selecao>
             </Campo>
             <Campo rotulo="Calda (L/ha)" className="col-span-2 sm:col-span-1">
               <div className={FIELD_WRAPPER_CLASS}><NumberField scale={0} value={f.calda} onChange={(v) => setF({ ...f, calda: Number(v) || 0 })} className={`${INPUT_CLASS} text-right`} /></div>
@@ -325,10 +326,10 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
               <div className={FIELD_WRAPPER_CLASS}><NumberField scale={2} required value={f.area} onChange={(v) => calcQtd(Number(v) || 0)} className={`${INPUT_CLASS} text-right`} /></div>
             </Campo>
             <Campo rotulo="UN da área" className="col-span-2 sm:col-span-1">
-              <select value={f.idUnArea} onChange={(e) => setF({ ...f, idUnArea: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+              <Selecao value={f.idUnArea} onChange={(e) => setF({ ...f, idUnArea: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
                 <option value={0}>HA</option>
                 {apoio.unCidasc.map((u) => <option key={u.id} value={u.id}>{u.sigla}</option>)}
-              </select>
+              </Selecao>
             </Campo>
             <Campo rotulo="Qtd. a adquirir" className="col-span-2 sm:col-span-1">
               <div className="flex gap-1">
@@ -337,19 +338,19 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
               </div>
             </Campo>
             <Campo rotulo="UN a adquirir (CIDASC)" className="col-span-2 sm:col-span-1">
-              <select required value={f.idUnQtd} onChange={(e) => setF({ ...f, idUnQtd: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+              <Selecao required value={f.idUnQtd} onChange={(e) => setF({ ...f, idUnQtd: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
                 <option value={0}>Selecione…</option>
                 {apoio.unCidasc.map((u) => <option key={u.id} value={u.id}>{u.sigla} – {u.descricao}</option>)}
-              </select>
+              </Selecao>
             </Campo>
             <Campo rotulo="Carência" className="col-span-2 sm:col-span-1">
               <input maxLength={25} value={f.carencia} onChange={(e) => setF({ ...f, carencia: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} />
             </Campo>
             <Campo rotulo="Tipo de aplicação" className="col-span-2 sm:col-span-1">
-              <select value={f.aplicacaoLiberado} onChange={(e) => setF({ ...f, aplicacaoLiberado: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+              <Selecao value={f.aplicacaoLiberado} onChange={(e) => setF({ ...f, aplicacaoLiberado: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
                 <option value="">–</option>
                 {liberados.map((x) => <option key={x.id} value={x.descricao}>{x.descricao}</option>)}
-              </select>
+              </Selecao>
             </Campo>
             <div className="col-span-4 sm:col-span-2 flex items-end pb-1">
               <Toggle checked={f.liberarAplicacoes} onChange={(v) => setF({ ...f, liberarAplicacoes: v })} label="Liberar nº de aplicações acima do máximo" />
@@ -359,10 +360,10 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
             </Campo>
             <Campo rotulo="Diagnóstico" className="col-span-4">
               {diagnosticos.length > 0 && (
-                <select value="" onChange={(e) => { const d = diagnosticos.find((x) => x.id === Number(e.target.value)); if (d) setF({ ...f, diagnostico: d.texto }); }} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} mb-1`}>
+                <Selecao value="" onChange={(e) => { const d = diagnosticos.find((x) => x.id === Number(e.target.value)); if (d) setF({ ...f, diagnostico: d.texto }); }} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} mb-1`}>
                   <option value="">Usar um diagnóstico cadastrado…</option>
                   {diagnosticos.map((d) => <option key={d.id} value={d.id}>{d.texto.slice(0, 100)}</option>)}
-                </select>
+                </Selecao>
               )}
               <textarea rows={3} value={f.diagnostico} onChange={(e) => setF({ ...f, diagnostico: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} resize-y`} />
             </Campo>
@@ -391,7 +392,7 @@ const vazia = (): Partial<Receita> => ({
 const ETAPAS = ['Dados iniciais', 'Produtos', 'Recomendações e observações'];
 
 /** Receita aberta numa aba, em 3 etapas com Voltar / Avançar */
-const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; onFechar: (gravou?: boolean) => void; onCarregou: (r: Receita) => void; onAlterou: (alterada: boolean) => void }> = ({ apoio, idInicial, onFechar, onCarregou, onAlterou }) => {
+const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number; onFechar: (gravou?: boolean) => void; onCarregou: (r: Receita) => void; onAlterou: (alterada: boolean) => void }> = ({ apoio, idInicial, clonarDe, onFechar, onCarregou, onAlterou }) => {
   const [r, setR] = useState<Partial<Receita>>(vazia);
   const [etapa, setEtapa] = useState(0);
   // Retrato do que está gravado (ou da receita em branco): diferente dele = alteração não gravada
@@ -416,9 +417,33 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; onFechar: (gravou
     if (rec.idCliente) get<any>(`/api/receitas/clientes/${rec.idCliente}`).then((c) => setLocalidades(c.localidades)).catch(() => {});
   };
 
+  /** Clonar: receita nova com o cabeçalho e os produtos de outra; número e CIDASC só no Gravar */
+  const clonar = async (id: number) => {
+    const o = await get<Receita>(`/api/receitas/${id}`);
+    const nova: Partial<Receita> = {
+      ...vazia(),
+      idArt: o.idArt, idCliente: o.idCliente, cliente: o.cliente, idCultura: o.idCultura, idLocalidade: o.idLocalidade,
+      idTipoLogradouro: o.idTipoLogradouro, localAplicacao: o.localAplicacao, altitude: o.altitude, latitude: o.latitude,
+      longitude: o.longitude, recomendacoes: o.recomendacoes, obs: [...o.obs],
+      produtos: (o.produtos || []).map((p, i): ProdutoLocal => ({
+        ...p, id: -(Date.now() + i),
+        // Mesmo corpo que o assistente monta; a original já passou pela conferência do nº de aplicações
+        corpo: {
+          idTratamento: p.idTratamento, dose: p.dose, idUnDose: p.idUnDose || 0, calda: p.calda, nrAplic: p.nrAplic, area: p.area,
+          qtdade: p.qtdade, idUnQtd: p.idUnQtd || 0, idUnArea: p.idUnArea || 0, carencia: p.carencia, aplicacao: p.aplicacao,
+          aplicacaoLiberado: p.aplicacaoLiberado, diagnostico: p.diagnostico, liberarAplicacoes: true,
+        },
+      })),
+    };
+    setR(nova);
+    setBase(JSON.stringify(nova));
+    if (o.idCliente) get<any>(`/api/receitas/clientes/${o.idCliente}`).then((c) => setLocalidades(c.localidades)).catch(() => {});
+  };
+
   useEffect(() => {
     get<{ id: number; texto: string }[]>('/api/observacoes').then(setObservacoes).catch(() => {});
     if (idInicial) carregar(idInicial).catch((e) => setErro(e.message));
+    else if (clonarDe) clonar(clonarDe).catch((e) => setErro(e.message));
     else {
       // Inclusão: ART única já vem marcada; foco no primeiro campo vazio
       const inicial = { ...vazia(), idArt: apoio.arts.length === 1 ? apoio.arts[0].id : 0 };
@@ -577,19 +602,19 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; onFechar: (gravou
       {etapa !== 1 && <form ref={form} onSubmit={(e) => { e.preventDefault(); etapa === 0 ? avancar() : gravarEFechar(); }} className="grid grid-cols-6 gap-3">
         {etapa === 0 && <>
         <Campo rotulo="ART / TRT" className="col-span-6 sm:col-span-2">
-          <select required disabled={dis} value={r.idArt || 0} onChange={(e) => setR({ ...r, idArt: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+          <Selecao required disabled={dis} value={r.idArt || 0} onChange={(e) => setR({ ...r, idArt: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
             <option value={0}>Selecione…</option>
             {apoio.arts.map((a) => <option key={a.id} value={a.id}>{a.numero} – {a.profissional}</option>)}
-          </select>
+          </Selecao>
         </Campo>
         <Campo rotulo="Profissional" className="col-span-6 sm:col-span-2">
           <input disabled value={art?.profissional || r.profissional || ''} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} />
         </Campo>
         <Campo rotulo="Cultura" className="col-span-6 sm:col-span-2">
-          <select required disabled={dis} value={r.idCultura || 0} onChange={(e) => setR({ ...r, idCultura: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+          <Selecao required disabled={dis} value={r.idCultura || 0} onChange={(e) => setR({ ...r, idCultura: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
             <option value={0}>Selecione…</option>
             {apoio.culturas.map((c) => <option key={c.id} value={c.id}>{c.nome}{c.idCidasc ? '' : ' (sem CIDASC)'}</option>)}
-          </select>
+          </Selecao>
         </Campo>
 
         <Campo rotulo="Cliente" className="col-span-6 sm:col-span-3">
@@ -602,16 +627,16 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; onFechar: (gravou
           />
         </Campo>
         <Campo rotulo="Tipo de logradouro" className="col-span-3 sm:col-span-1">
-          <select required disabled={dis} value={r.idTipoLogradouro || 0} onChange={(e) => setR({ ...r, idTipoLogradouro: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+          <Selecao required disabled={dis} value={r.idTipoLogradouro || 0} onChange={(e) => setR({ ...r, idTipoLogradouro: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
             <option value={0}>Selecione…</option>
             {apoio.tiposLogradouro.map((t) => <option key={t.id} value={t.id}>{t.descricao}</option>)}
-          </select>
+          </Selecao>
         </Campo>
         <Campo rotulo="Localidade" className="col-span-3 sm:col-span-2">
-          <select required disabled={dis} value={r.idLocalidade || 0} onChange={(e) => setR({ ...r, idLocalidade: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+          <Selecao required disabled={dis} value={r.idLocalidade || 0} onChange={(e) => setR({ ...r, idLocalidade: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
             <option value={0}>{r.idCliente && !localidades.length ? 'Nenhuma localidade no município do cliente' : 'Selecione…'}</option>
             {localidades.map((l) => <option key={l.id} value={l.id}>{l.descricao}</option>)}
-          </select>
+          </Selecao>
         </Campo>
 
         <Campo rotulo="Local da aplicação" className="col-span-6 sm:col-span-3">
@@ -645,10 +670,10 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; onFechar: (gravou
           <div className="flex items-center justify-between gap-3">
             <label className={LABEL_CLASS}>Observações</label>
             {!dis && observacoes.length > 0 && (
-              <select value="" onChange={(e) => { const o = observacoes.find((x) => x.id === Number(e.target.value)); if (o) usarObs(o.texto); }} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} max-w-sm`}>
+              <Selecao value="" onChange={(e) => { const o = observacoes.find((x) => x.id === Number(e.target.value)); if (o) usarObs(o.texto); }} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} max-w-sm`}>
                 <option value="">Incluir observação cadastrada…</option>
                 {observacoes.map((o) => <option key={o.id} value={o.id}>{o.texto}</option>)}
-              </select>
+              </Selecao>
             )}
           </div>
           {/* 8 linhas coladas, como um texto: Enter e setas passam de linha */}
@@ -821,6 +846,11 @@ const Impressao: React.FC<{ id: number; onFechar: (imprimiu: boolean) => void }>
   );
 };
 
+/** Coluna Ações mais larga: aqui ficam até 5 ícones soltos (exceção pedida ao padrão do menu "...") */
+const largura4 = (c: string) => `${c.replace(/(min-w|max-w|w)-24/g, '')} w-40 min-w-40 max-w-40`;
+const TH_ACOES_4 = largura4(TH_ACOES);
+const TD_ACOES_4 = largura4(TD_ACOES);
+
 // =====================================================================
 // Lista
 // =====================================================================
@@ -832,11 +862,28 @@ export const ReceitasView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   // Abas abertas sobre a lista (modelo do CrudView do crmWeb); `uid` fixo para a aba não remontar ao gravar a inclusão
-  const [abas, setAbas] = useState<{ uid: number; id: number; titulo: string }[]>([]);
+  const [abas, setAbas] = useState<{ uid: number; id: number; titulo: string; clonarDe?: number }[]>([]);
   const [abaAtiva, setAbaAtiva] = useState(0);
   const [imprimindo, setImprimindo] = useState<number | null>(null);
   const [excluindo, setExcluindo] = useState<Receita | null>(null);
   const [processando, setProcessando] = useState(false);
+  // Envio ou cancelamento no SIGEN da CIDASC (receita_e.exe)
+  const [cidasc, setCidasc] = useState<{ r: Receita; cancelar: boolean } | null>(null);
+
+  const confirmarCidasc = async () => {
+    if (!cidasc) return;
+    try {
+      setProcessando(true);
+      const r = await send<{ mensagem: string }>('POST', `/api/receitas/${cidasc.r.id}/cidasc${cidasc.cancelar ? '/cancelar' : ''}`);
+      toast(r.mensagem);
+    } catch (e: any) {
+      setErro(e.message);
+    } finally {
+      setProcessando(false);
+      setCidasc(null);
+      carregar();
+    }
+  };
 
   const carregar = async () => {
     try {
@@ -872,11 +919,18 @@ export const ReceitasView: React.FC = () => {
 
   /** id 0 = inclusão (reaproveita a aba "Nova" já aberta) */
   const abrir = (id: number) => {
-    const existente = abas.find((a) => a.id === id);
+    const existente = abas.find((a) => a.id === id && !a.clonarDe);
     if (existente) return setAbaAtiva(existente.uid);
     const uid = Date.now();
     const r = lista.find((x) => x.id === id);
     setAbas([...abas, { uid, id, titulo: r ? `Receita ${r.numeroReceitaFull || r.numeroReceita || `#${id}`}` : 'Nova receita' }]);
+    setAbaAtiva(uid);
+  };
+
+  /** Clonar: abre uma aba de inclusão já preenchida com a receita escolhida */
+  const clonar = (r: Receita) => {
+    const uid = Date.now();
+    setAbas([...abas, { uid, id: 0, clonarDe: r.id, titulo: `Cópia de ${r.numeroReceitaFull || r.numeroReceita || `#${r.id}`}` }]);
     setAbaAtiva(uid);
   };
 
@@ -909,7 +963,7 @@ export const ReceitasView: React.FC = () => {
       {/* Abas ficam montadas (escondidas) para não perder o que está sendo digitado */}
       {apoio && abas.map((a) => (
         <div key={a.uid} className={abaAtiva === a.uid ? 'flex-1 flex flex-col min-h-0' : 'hidden'}>
-          <ReceitaForm apoio={apoio} idInicial={a.id} onFechar={(gravou) => (gravou ? fecharJa(a.uid) : fechar(a.uid))} onCarregou={(r) => carregou(a.uid, r)}
+          <ReceitaForm apoio={apoio} idInicial={a.id} clonarDe={a.clonarDe} onFechar={(gravou) => (gravou ? fecharJa(a.uid) : fechar(a.uid))} onCarregou={(r) => carregou(a.uid, r)}
             onAlterou={(sim) => (sim ? alteradas.current.add(a.uid) : alteradas.current.delete(a.uid))} />
         </div>
       ))}
@@ -918,10 +972,10 @@ export const ReceitasView: React.FC = () => {
       <div className={BARRA}>
         <div className={BARRA_INFO}>{loading ? 'Carregando…' : `${lista.length} receita(s)${truncado ? ' (mostrando as 500 mais recentes)' : ''}`}</div>
         <div className="flex items-center gap-2.5 shrink-0">
-          <select value={filtro.art} onChange={(e) => setFiltro({ ...filtro, art: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} w-44`}>
+          <Selecao value={filtro.art} onChange={(e) => setFiltro({ ...filtro, art: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} w-44`}>
             <option value={0}>Todas as ARTs</option>
             {apoio?.arts.map((a) => <option key={a.id} value={a.id}>{a.numero}</option>)}
-          </select>
+          </Selecao>
           <div className="w-36"><DateField value={filtro.d1} onChange={(d1) => setFiltro({ ...filtro, d1 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} /></div>
           <div className="w-36"><DateField value={filtro.d2} onChange={(d2) => setFiltro({ ...filtro, d2 })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} placeholder="até hoje" /></div>
           <button type="button" onClick={carregar} disabled={loading} title="Recarregar" className={BTN_SECUNDARIO}><RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /></button>
@@ -936,7 +990,7 @@ export const ReceitasView: React.FC = () => {
             <tr>
               <th className={TH_INDICADOR} />
               {['Data', 'Nº', 'Número completo', 'ART', 'Cliente', 'Cultura', 'Profissional', 'Nº CIDASC', 'Situação'].map((h) => <th key={h} className={TH}>{h}</th>)}
-              <th className={TH_ACOES}>Ações</th>
+              <th className={TH_ACOES_4}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -957,9 +1011,13 @@ export const ReceitasView: React.FC = () => {
                 <td className={TD}>{r.profissional}</td>
                 <td className={`${TD} text-right font-mono`}>{r.numeroReceitaCidasc || '–'}</td>
                 <td className={`${TD} text-center`}>{situacao(r)}</td>
-                <td className={TD_ACOES}>
+                {/* Exceção pedida: 4 ícones soltos (CIDASC é envio ou cancelamento, nunca os dois) */}
+                <td className={TD_ACOES_4}>
                   <div className="inline-flex items-center gap-1">
                     <BotaoAcao icone={Printer} titulo="Imprimir" descricao="imprimir a receita" tom="verde" onClick={() => setImprimindo(r.id)} />
+                    {!r.cancelada && !r.numeroReceitaCidasc && <BotaoAcao icone={Send} titulo="Enviar à CIDASC" descricao="transmitir a receita ao SIGEN" onClick={() => setCidasc({ r, cancelar: false })} />}
+                    {!!r.numeroReceitaCidasc && !r.canceladaCidasc && <BotaoAcao icone={Ban} titulo="Cancelar na CIDASC" descricao="cancelar a receita no SIGEN" onClick={() => setCidasc({ r, cancelar: true })} />}
+                    <BotaoAcao icone={Copy} titulo="Clonar" descricao="nova receita com os dados desta" onClick={() => clonar(r)} />
                     <BotaoAcao icone={Pencil} titulo="Editar" descricao="abrir a receita" onClick={() => abrir(r.id)} />
                     {!r.cancelada && <BotaoAcao icone={Trash2} titulo="Excluir" descricao="cancelar ou excluir a receita" tom="perigo" onClick={() => setExcluindo(r)} />}
                   </div>
@@ -979,6 +1037,20 @@ export const ReceitasView: React.FC = () => {
           textoConfirmar="Descartar"
           onConfirmar={() => fecharJa(fechando)}
           onCancelar={() => setFechando(null)}
+        />
+      )}
+      {cidasc && (
+        <ConfirmModal
+          titulo={cidasc.cancelar ? 'Cancelar na CIDASC' : 'Enviar à CIDASC'}
+          mensagem={cidasc.cancelar
+            ? <>Cancelar no SIGEN a receita <strong>{cidasc.r.numeroReceitaFull}</strong> (CIDASC nº {cidasc.r.numeroReceitaCidasc}) de {cidasc.r.cliente}?</>
+            : <>Transmitir ao SIGEN da CIDASC a receita <strong>{cidasc.r.numeroReceitaFull || `#${cidasc.r.id}`}</strong> de {cidasc.r.cliente}? {!cidasc.r.numeroReceita && 'A receita recebe o número agora.'} Depois de enviada, ela não pode mais ser alterada.</>}
+          textoConfirmar={cidasc.cancelar ? 'Cancelar na CIDASC' : 'Enviar'}
+          neutro={!cidasc.cancelar}
+          icone={cidasc.cancelar ? Ban : Send}
+          processando={processando}
+          onConfirmar={confirmarCidasc}
+          onCancelar={() => setCidasc(null)}
         />
       )}
       {excluindo && (

@@ -1,12 +1,15 @@
 import React from 'react';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, LucideIcon } from 'lucide-react';
 import { Modal } from './Modal';
-import { BTN_SECUNDARIO } from '../utils/listaStyles';
+import { BTN_PRIMARIO, BTN_SECUNDARIO } from '../utils/listaStyles';
 
 interface ConfirmModalProps {
   titulo: string;
   mensagem: React.ReactNode;
   textoConfirmar?: string;
+  /** Ação que não apaga (ex.: enviar): botão na cor principal */
+  neutro?: boolean;
+  icone?: LucideIcon;
   processando?: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
@@ -17,6 +20,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   titulo,
   mensagem,
   textoConfirmar = 'Excluir',
+  neutro,
+  icone: Icone = Trash2,
   processando,
   onConfirmar,
   onCancelar,
@@ -32,9 +37,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         onClick={onConfirmar}
         disabled={processando}
         autoFocus
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+        className={neutro ? BTN_PRIMARIO : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50'}
       >
-        {processando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        {processando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icone className="w-3.5 h-3.5" />}
         <span>{textoConfirmar}</span>
       </button>
     </div>

@@ -17,6 +17,7 @@ import { DefensivosView } from './components/DefensivosView';
 import {
   ProfissionaisView, ArtsView, ObservacoesView, DiagnosticosView, ClientesView, CulturasView, PragasView,
 } from './components/CadastrosViews';
+import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { MeusDadosModal } from './components/MeusDadosModal';
 import { Toast } from './components/Toast';
 
@@ -104,6 +105,7 @@ export const App: React.FC = () => {
     observacoes: 'Observações',
     diagnosticos: 'Diagnósticos',
     clientes: 'Clientes',
+    configuracoes: 'Configurações',
   };
 
   const titulo = titulosPorAba[activeTab] || titulosPorAba.dashboard;
@@ -174,6 +176,7 @@ export const App: React.FC = () => {
             {activeTab === 'observacoes' && <ObservacoesView />}
             {activeTab === 'diagnosticos' && <DiagnosticosView />}
             {activeTab === 'clientes' && <ClientesView />}
+            {activeTab === 'configuracoes' && <ConfiguracoesView />}
           </main>
         )}
       </div>

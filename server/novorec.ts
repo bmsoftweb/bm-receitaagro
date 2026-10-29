@@ -29,7 +29,9 @@ async function getJson(url: string, token: string): Promise<any> {
     throw new BmapiError(`Não foi possível acessar a API do Novo Receituário (${err?.cause?.code || err?.message}).`, 503);
   }
   if (res.status === 401 || res.status === 403) {
-    throw new BmapiError('A API do Novo Receituário recusou o token (rec_config.tokenId_novorec).', 503);
+    // Motivo que a API devolve (token inválido, assinatura vencida...), sem repetir o token
+    const motivo = (await res.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 200);
+    throw new BmapiError(`A API do Novo Receituário recusou o token (rec_config.tokenId_novorec): HTTP ${res.status}${motivo ? ` - ${motivo}` : ''}.`, 503);
   }
   if (!res.ok) throw new BmapiError(`API do Novo Receituário respondeu HTTP ${res.status}.`, 503);
   return res.json();

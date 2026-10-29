@@ -159,7 +159,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <div>
               <div className="flex items-center justify-between ml-1 mb-1.5">
                 <label htmlFor="input-login-token" className="block text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500">
-                  Token
+                  Token API
                 </label>
                 {checandoServidor ? (
                   <span className="text-[11px] text-stone-400 flex items-center gap-1">

@@ -7,6 +7,7 @@ import {
 import { rota, texto, idParam, busca } from './util.js';
 import { lerRecConfig } from './cadastros.js';
 import { SQL_TRATAMENTO, mapearTratamento } from './compendio.js';
+import { transmitirCidasc } from './cidasc.js';
 import { syncCulturasDoProduto, syncProdutosDaCultura, syncPragas, syncTratamento } from './novorec.js';
 import {
   doseValida, numeroReceitaFull, chavePdf, tiposAplicacaoLiberados,
@@ -81,6 +82,7 @@ const SQL_PRODUTOS = `
   SELECT A.ID id, A.ID_DEFENSIVO id_def, A.ID_NOVOREC id_novorec, A.ID_DEFENSIVO_CIDASC id_def_cidasc,
          A.ID_CULTURA id_cultura, A.ID_PRAGA id_praga, A.ID_TRATAMENTO id_tratamento, A.DOSE dose, A.DOSE_UN dose_un,
          A.QTDADE qtdade, A.QTDADE_UN qtdade_un, A.CALDA_HA calda, A.NR_APLIC nr_aplic, A.AREA_HA area, A.AREA_UN area_un,
+         A.ID_DOSE_UN_CIDASC id_un_dose, A.ID_UN_CIDASC id_un_qtd, A.ID_UN_AREA_CIDASC id_un_area,
          A.CARENCIA carencia, A.APLICACAO_LIBERADO aplicacao_liberado, CAST(A.APLICACAO AS VARCHAR(250)) aplicacao,
          CAST(A.DIAGNOSTICO AS VARCHAR(512)) diagnostico,
          D.NOME defensivo, C.NOME cultura, G.NOME praga, G.NOME_CIENTIFICO praga_cientifico
@@ -110,6 +112,9 @@ function mapearProduto(p: Record<string, any>) {
     nrAplic: n(p.nr_aplic),
     area: n(p.area),
     areaUn: s(p.area_un),
+    idUnDose: n(p.id_un_dose),
+    idUnQtd: n(p.id_un_qtd),
+    idUnArea: n(p.id_un_area),
     carencia: s(p.carencia),
     aplicacaoLiberado: s(p.aplicacao_liberado),
     aplicacao: s(p.aplicacao),
@@ -446,6 +451,19 @@ export function createReceitasRouter() {
     res.json({ acao: 'excluida', mensagem: 'Receita EXCLUÍDA da base de dados!' });
   }));
 
+  // ======================= CIDASC (SIGEN) =======================
+  r.post('/receitas/:id/cidasc', rota(async (req, res) => {
+    const id = idParam(req);
+    const rec = await carregarReceita(id);
+    if (s(rec.cancelado) === 'S') throw new BmapiError('Receita cancelada não pode ser enviada.');
+    await gerarNumero(id);
+    res.json({ mensagem: await transmitirCidasc(id) });
+  }));
+
+  r.post('/receitas/:id/cidasc/cancelar', rota(async (req, res) => {
+    res.json({ mensagem: await transmitirCidasc(idParam(req), true) });
+  }));
+
   // ======================= Assistente do produto =======================
   /** 1. Defensivos com uso na cultura da receita (ou em culturas genéricas, id CIDASC 132) */
   r.get('/receitas/:id/assistente/defensivos', rota(async (req, res) => {
@@ -669,10 +687,9 @@ export function createReceitasRouter() {
     const produtos = await produtosDaReceita(id);
     if (!produtos.length) throw new BmapiError('Receita sem produtos.');
     if (produtos.length > 10) throw new BmapiError('O sistema aceita (no máximo) 10 produtos por receita.');
-    if (config.exigeCidascParaImprimir && !n(rec.numero_receita_cidasc)) {
-      throw new BmapiError('Você deve transmitir o receituário à CIDASC antes de imprimir!');
-    }
     await gerarNumero(id);
+    // Como o receita_e.exe: sem o número da CIDASC, transmite antes de imprimir
+    if (config.exigeCidascParaImprimir && !n(rec.numero_receita_cidasc)) await transmitirCidasc(id);
     const atual = await carregarReceita(id);
 
     const itens = [];

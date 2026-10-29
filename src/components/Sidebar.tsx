@@ -13,6 +13,7 @@ import {
   LogOut,
   X,
   User,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import { Usuario } from '../types';
@@ -27,10 +28,11 @@ export type NavTab =
   | 'arts'
   | 'observacoes'
   | 'diagnosticos'
-  | 'clientes';
+  | 'clientes'
+  | 'configuracoes';
 
 export const NAV_TABS: NavTab[] = [
-  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes',
+  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes', 'configuracoes',
 ];
 
 export const GRUPOS: { titulo: string; itens: { id: NavTab; label: string; icon: LucideIcon }[] }[] = [
@@ -54,6 +56,7 @@ export const GRUPOS: { titulo: string; itens: { id: NavTab; label: string; icon:
       { id: 'clientes', label: 'Clientes', icon: Users },
     ],
   },
+  { titulo: 'Sistema', itens: [{ id: 'configuracoes', label: 'Configurações', icon: Settings }] },
 ];
 
 interface SidebarProps {

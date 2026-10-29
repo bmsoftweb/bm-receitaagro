@@ -96,6 +96,9 @@ export interface ProdutoReceita {
   nrAplic: number;
   area: number;
   areaUn: string;
+  idUnDose?: number;
+  idUnQtd?: number;
+  idUnArea?: number;
   carencia: string;
   aplicacaoLiberado: string;
   aplicacao: string;

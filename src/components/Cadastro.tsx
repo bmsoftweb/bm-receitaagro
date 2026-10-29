@@ -12,6 +12,7 @@ import { toast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 import { NumberField } from './NumberField';
 import { Toggle } from './Toggle';
+import { Selecao } from './Selecao';
 import { BotaoAcao, MenuAcoes, SeparadorAcoes } from './MenuAcoes';
 import { Opcao } from '../types';
 
@@ -241,10 +242,10 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         break;
       case 'select':
         input = (
-          <select required={c.obrigatorio} value={v ?? 0} onChange={(e) => set(Number(e.target.value))} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
+          <Selecao required={c.obrigatorio} value={v ?? 0} onChange={(e) => set(Number(e.target.value))} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`}>
             <option value={0}>Selecione…</option>
             {c.opcoes?.map((o) => <option key={o.id} value={o.id}>{o.descricao}</option>)}
-          </select>
+          </Selecao>
         );
         break;
       case 'textarea':
