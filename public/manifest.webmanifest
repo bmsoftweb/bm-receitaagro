@@ -1,0 +1,16 @@
+{
+  "name": "ReceitaWeb — Receituário Agronômico",
+  "short_name": "ReceitaWeb",
+  "description": "Ordens de produção, insumos, lotes e custos via bmAPI.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "pt-BR",
+  "background_color": "#f5f5f4",
+  "theme_color": "#f59e0b",
+  "icons": [
+    { "src": "/icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icone-mascara.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
