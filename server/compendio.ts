@@ -295,12 +295,20 @@ export function createCompendioRouter() {
   r.post('/defensivos/atualizar', rotaProgresso((progresso) => atualizarCatalogo(progresso)));
 
   /** Tabela da CIDASC inteira para conferência, lida em páginas pelo código (a bmAPI corta resultados grandes) */
-  r.get('/cidasc/tabela/:tipo(agrotoxicos|culturas|pragas)', rota(async (req, res) => {
-    const sql = {
-      agrotoxicos: 'SELECT IDAGROTOXICO id, NRREGISTROMAPA mapa, NMMARCACOMERCIAL nome, CSSITUACAO situacao FROM REC_DEFENSIVOS_CIDASC WHERE IDAGROTOXICO',
-      culturas: 'SELECT IDNOMECOMUMESPECIEVEGETAL id, NMCOMUMESPECIEVEGERAL nome FROM REC_CULTURAS_CIDASC WHERE IDNOMECOMUMESPECIEVEGETAL',
-      pragas: 'SELECT IDPRAGA id, NMCIENTIFICOPRAGA nome FROM REC_PRAGAS_CIDASC WHERE IDPRAGA',
-    }[req.params.tipo as 'agrotoxicos' | 'culturas' | 'pragas'];
+  const TABELAS_CIDASC: Record<string, string> = {
+    agrotoxicos: 'SELECT IDAGROTOXICO id, NRREGISTROMAPA mapa, NMMARCACOMERCIAL nome, CSSITUACAO situacao FROM REC_DEFENSIVOS_CIDASC WHERE IDAGROTOXICO',
+    culturas: 'SELECT IDNOMECOMUMESPECIEVEGETAL id, NMCOMUMESPECIEVEGERAL nome FROM REC_CULTURAS_CIDASC WHERE IDNOMECOMUMESPECIEVEGETAL',
+    pragas: 'SELECT IDPRAGA id, NMCIENTIFICOPRAGA nome FROM REC_PRAGAS_CIDASC WHERE IDPRAGA',
+    localidades: 'SELECT ID id, UF uf, CODIGO_IBGE ibge, MUNICIPIO municipio, LOCALIDADE nome FROM PESSOASLOCALIDADESRECEITA WHERE ID',
+    logradouros: 'SELECT ID id, DESCRICAO nome FROM PESSOASTIPOSLOGRADOUROS WHERE ID',
+    unidades: 'SELECT ID id, SGUNIDADEMEDIDA sigla, DSUNIDADEMEDIDA nome FROM REC_UN_CIDASC WHERE ID',
+    derivadas: `SELECT ID id, UN sigla, DESCRICAO nome, ID_CIDASC_UN_EMPREGADA empregada, ID_CIDASC_UN_APLICACAO aplicacao
+                  FROM PRODUTOSUNDERIVADAS WHERE ID`,
+    embalagens: 'SELECT ID id, NRVALORUNITARIO valor, DSDESCRICAO nome FROM REC_UN_MEDIDAS_CIDASC WHERE ID',
+  };
+  r.get('/cidasc/tabela/:tipo', rota(async (req, res) => {
+    const sql = TABELAS_CIDASC[req.params.tipo];
+    if (!sql) throw new BmapiError('Tabela da CIDASC desconhecida.', 404);
     const linhas: any[] = [];
     for (let ultimo = -1; ;) {
       const pagina = await consultarComLimite(`${sql} > ${ultimo} ORDER BY id TOP 500`);
@@ -309,10 +317,7 @@ export function createCompendioRouter() {
       if (pagina.rows.length < 500) break;
       ultimo = Number(pagina.rows[pagina.rows.length - 1].id);
     }
-    res.json(linhas.map((c) => ({
-      id: Number(c.id), nome: String(c.nome || '').trim(),
-      ...(c.mapa !== undefined ? { registroMapa: String(c.mapa || '').trim(), situacao: String(c.situacao || '').trim() } : {}),
-    })));
+    res.json(linhas.map((c) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]))));
   }));
 
   /** Agrotóxicos, culturas e pragas da CIDASC (SIGEN de rec_config.url_ws) */

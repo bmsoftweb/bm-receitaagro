@@ -14,6 +14,7 @@ import { DateField } from './DateField';
 import { Toggle } from './Toggle';
 import { BotaoAcao } from './MenuAcoes';
 import { BarraAbas, AbaAberta } from './BarraAbas';
+import { usePaginacao } from './Paginacao';
 
 interface Mestre { id: number; geradoEm: string; dataInicial: string; dataFinal: string; total: number; enviados: number; erros: number }
 interface Item {
@@ -248,6 +249,8 @@ export const MovimentoView: React.FC = () => {
   };
   const fechar = (u: number) => { setAbas((as) => as.filter((a) => a.uid !== u)); if (ativa === u) setAtiva(0); };
 
+  const paginacao = usePaginacao(mestres, '');
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <BarraAbas rotulo="Movimentos" total={mestres.length} abas={abas} ativa={ativa} onAtivar={setAtiva} onFechar={fechar} />
@@ -270,6 +273,7 @@ export const MovimentoView: React.FC = () => {
             {sigenProducao !== null && <> · SIGEN: {sigenProducao ? <strong className="text-rose-600">produção</strong> : 'homologação (testes)'}</>}
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
+            {paginacao.seletor}
             <button type="button" onClick={carregar} disabled={carregando} title="Recarregar" className={BTN_SECUNDARIO}><RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin' : ''}`} /></button>
             <button type="button" onClick={() => abrir(0)} className={BTN_PRIMARIO}><Plus className="w-3.5 h-3.5" /><span>Novo movimento</span></button>
           </div>
@@ -291,7 +295,7 @@ export const MovimentoView: React.FC = () => {
                   {carregando ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</span>
                     : <div className="flex flex-col items-center gap-2"><Inbox className="w-8 h-8" /><span className="text-sm font-medium">Nenhum movimento gravado</span></div>}
                 </td></tr>
-              ) : mestres.map((m) => (
+              ) : paginacao.visiveis.map((m) => (
                 <tr key={m.id} className={TR} onDoubleClick={() => abrir(m.id)}>
                   <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
                   <td className={`${TD} text-right font-mono`}>{m.id}</td>
@@ -313,6 +317,7 @@ export const MovimentoView: React.FC = () => {
             </tbody>
           </table>
         </div>
+        {paginacao.rodape}
       </div>
     </div>
   );

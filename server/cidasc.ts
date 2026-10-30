@@ -1,4 +1,4 @@
-import { consultar, consultarUm, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlInteiro } from './bmapi.js';
+import { consultar, consultarUm, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlInteiro, sqlNumero } from './bmapi.js';
 import { lerRecConfig } from './cadastros.js';
 import { semAcento, Progresso } from './util.js';
 
@@ -208,45 +208,94 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
 }
 
 /**
- * Tabelas da CIDASC (ufrmAtualizar): agrotóxicos, culturas e pragas pelos Pesquisar do SIGEN, que não pedem login.
- * Baixa as três antes de mexer na base e só então esvazia e grava cada uma, como o Delphi.
- * O MAPA fica só com dígitos e sem zeros à esquerda (IntToStr(StrToInt(SoNumeros))), como o Delphi grava.
+ * Tabelas da CIDASC (ufrmAtualizar), pelos Pesquisar do SIGEN, que não pedem login. Baixa todas
+ * antes de mexer na base e só então esvazia e grava cada uma, como o Delphi (mesmos campos, tamanhos
+ * e acertos de texto). O MAPA fica só com dígitos e sem zeros à esquerda (IntToStr(StrToInt(SoNumeros))).
+ * Localidades: SC e as outras UFs que já estão na tabela (no Delphi vinham do ufs_localidades.txt).
  */
-export async function atualizarTabelasCidasc(progresso: Progresso = () => {}): Promise<{ ambiente: string; agrotoxicos: number; culturas: number; pragas: number }> {
+export async function atualizarTabelasCidasc(progresso: Progresso = () => {}): Promise<Record<string, string | number>> {
   const cfg = await lerRecConfig();
   if (!cfg.urlWs) throw new BmapiError('URL do SIGEN da CIDASC não configurada (rec_config.url_ws).');
   const url = cfg.urlWs.replace(/\/+$/, '');
-  const lista = async (recurso: string, chave: string) => {
+  const lista = async (recurso: string, chave: string, rotulo: string) => {
+    progresso(`Baixando ${rotulo} do SIGEN`);
     const r = await chamar(`${url}/${recurso}`, { method: 'GET' });
     const itens = r.corpo?.[chave];
     if (r.status !== 200 || !Array.isArray(itens) || !itens.length) {
-      throw new BmapiError(mensagens(r.corpo) || `O SIGEN não devolveu a lista de ${chave} (HTTP ${r.status}).`);
+      throw new BmapiError(mensagens(r.corpo) || `O SIGEN não devolveu ${rotulo} (HTTP ${r.status}).`);
     }
     return itens as any[];
   };
-  progresso('Baixando os agrotóxicos do SIGEN');
-  const agrotoxicos = await lista('Agrotoxico/Pesquisar?nrRegistroMapa=', 'agrotoxicos');
-  progresso('Baixando as culturas do SIGEN');
-  const culturas = await lista('Cultura/Pesquisar', 'culturas');
-  progresso('Baixando as pragas do SIGEN');
-  const pragas = await lista('Praga/Pesquisar', 'pragas');
+  const maiusculo = (v: unknown, tam: number) => sqlTexto(semAcento(s(v)).toUpperCase(), tam);
+  /** AcertaUnidade do Delphi: minúsculas e sem espaço em volta da barra */
+  const unidade = (v: unknown) => semAcento(s(v)).toLowerCase().replace(/ \//g, '/').replace(/\/ /g, '/');
 
-  const maiusculo = (v: unknown, tam: number) => sqlTexto(semAcento(v).toUpperCase(), tam);
-  await executar('DELETE FROM REC_DEFENSIVOS_CIDASC');
-  await executarScript([
-    ...agrotoxicos.map((a) => `INSERT INTO REC_DEFENSIVOS_CIDASC (IDAGROTOXICO, NRREGISTROMAPA, NMMARCACOMERCIAL, CSSITUACAO)
-      VALUES (${sqlInteiro(n(a.idAgrotoxico))}, ${sqlTexto(s(a.nrRegistroMapa).replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0', 15)},
-              ${maiusculo(a.nmMarcaComercial, 50)}, ${maiusculo(a.csSituacao, 10)})`),
-  ], (f, t) => progresso('Gravando os agrotóxicos', f, t));
-  await executar('DELETE FROM REC_CULTURAS_CIDASC');
-  await executarScript([
-    ...culturas.map((c) => `INSERT INTO REC_CULTURAS_CIDASC (IDNOMECOMUMESPECIEVEGETAL, NMCOMUMESPECIEVEGERAL)
-      VALUES (${sqlInteiro(n(c.idNomeComumEspecieVegetal))}, ${maiusculo(c.nmComumEspecieVegetal, 50)})`),
-  ], (f, t) => progresso('Gravando as culturas', f, t));
-  await executar('DELETE FROM REC_PRAGAS_CIDASC');
-  await executarScript([
-    ...pragas.map((g) => `INSERT INTO REC_PRAGAS_CIDASC (IDPRAGA, NMCIENTIFICOPRAGA)
-      VALUES (${sqlInteiro(n(g.idPraga))}, ${sqlTexto(semAcento(g.nmCientificoPraga), 80)})`),
-  ], (f, t) => progresso('Gravando as pragas', f, t));
-  return { ambiente: /homologacao/i.test(url) ? 'homologação' : 'produção', agrotoxicos: agrotoxicos.length, culturas: culturas.length, pragas: pragas.length };
+  const ufs = (await consultar('SELECT UF uf FROM PESSOASLOCALIDADESRECEITA GROUP BY UF'))
+    .map((r) => s(r.uf).toUpperCase()).filter((uf) => /^[A-Z]{2}$/.test(uf) && uf !== 'SC');
+  const localidades = (await lista('LocalidadeDeSantaCatarina/Pesquisar', 'localidades', 'as localidades de SC')).map((l) => ({ ...l, uf: 'SC' }));
+  for (const uf of ufs) {
+    localidades.push(...(await lista(`LocalidadeOutrosEstados/Pesquisar?sgUF=${uf}`, 'localidades', `as localidades de ${uf}`)).map((l) => ({ ...l, uf })));
+  }
+
+  // Na ordem das abas da tela; cada uma: tabela, rótulo e os INSERTs
+  const tabelas: { chave: string; tabela: string; rotulo: string; insert: string[] }[] = [
+    {
+      chave: 'agrotoxicos', tabela: 'REC_DEFENSIVOS_CIDASC', rotulo: 'os agrotóxicos',
+      insert: (await lista('Agrotoxico/Pesquisar?nrRegistroMapa=', 'agrotoxicos', 'os agrotóxicos')).map((a) =>
+        `INSERT INTO REC_DEFENSIVOS_CIDASC (IDAGROTOXICO, NRREGISTROMAPA, NMMARCACOMERCIAL, CSSITUACAO)
+          VALUES (${sqlInteiro(n(a.idAgrotoxico))}, ${sqlTexto(s(a.nrRegistroMapa).replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0', 15)},
+                  ${maiusculo(a.nmMarcaComercial, 50)}, ${maiusculo(a.csSituacao, 10)})`),
+    },
+    {
+      chave: 'culturas', tabela: 'REC_CULTURAS_CIDASC', rotulo: 'as culturas',
+      insert: (await lista('Cultura/Pesquisar', 'culturas', 'as culturas')).map((c) =>
+        `INSERT INTO REC_CULTURAS_CIDASC (IDNOMECOMUMESPECIEVEGETAL, NMCOMUMESPECIEVEGERAL)
+          VALUES (${sqlInteiro(n(c.idNomeComumEspecieVegetal))}, ${maiusculo(c.nmComumEspecieVegetal, 50)})`),
+    },
+    {
+      chave: 'pragas', tabela: 'REC_PRAGAS_CIDASC', rotulo: 'as pragas',
+      insert: (await lista('Praga/Pesquisar', 'pragas', 'as pragas')).map((g) =>
+        `INSERT INTO REC_PRAGAS_CIDASC (IDPRAGA, NMCIENTIFICOPRAGA) VALUES (${sqlInteiro(n(g.idPraga))}, ${sqlTexto(semAcento(s(g.nmCientificoPraga)), 80)})`),
+    },
+    {
+      chave: 'localidades', tabela: 'PESSOASLOCALIDADESRECEITA', rotulo: 'as localidades',
+      insert: localidades.map((l) =>
+        `INSERT INTO PESSOASLOCALIDADESRECEITA (ID, UF, CODIGO_IBGE, MUNICIPIO, LOCALIDADE)
+          VALUES (${sqlInteiro(n(l.idLocalidade))}, ${sqlTexto(l.uf, 2)}, ${sqlTexto(s(l.nrCodigoIBGE), 7)},
+                  ${maiusculo(l.nmMunicipio, 40)}, ${maiusculo(l.nmlocalidade, 50)})`),
+    },
+    {
+      chave: 'logradouros', tabela: 'PESSOASTIPOSLOGRADOUROS', rotulo: 'os tipos de logradouro',
+      insert: (await lista('TipoLogradouro/Pesquisar', 'tipos', 'os tipos de logradouro')).map((t) =>
+        `INSERT INTO PESSOASTIPOSLOGRADOUROS (ID, DESCRICAO) VALUES (${sqlInteiro(n(t.idTipoLogradouro))}, ${maiusculo(t.nmTipoLogradouro, 25)})`),
+    },
+    {
+      chave: 'unidades', tabela: 'REC_UN_CIDASC', rotulo: 'as unidades de medida',
+      insert: (await lista('UnidadeMedida/Pesquisar', 'UnidadeMedidas', 'as unidades de medida')).map((u) =>
+        `INSERT INTO REC_UN_CIDASC (ID, SGUNIDADEMEDIDA, DSUNIDADEMEDIDA)
+          VALUES (${sqlInteiro(n(u.idUnidadeMedida))}, ${maiusculo(u.sgUnidadeMedida, 10)}, ${maiusculo(u.dsUnidadeMedida, 20)})`),
+    },
+    {
+      chave: 'derivadas', tabela: 'PRODUTOSUNDERIVADAS', rotulo: 'as unidades derivadas',
+      insert: (await lista('UnidadeDerivada/Pesquisar', 'unidades', 'as unidades derivadas')).map((u) =>
+        `INSERT INTO PRODUTOSUNDERIVADAS (ID, ID_CIDASC, ID_CIDASC_UN_EMPREGADA, ID_CIDASC_UN_APLICACAO, UN, DESCRICAO)
+          VALUES (${sqlInteiro(n(u.idUnidadeDerivada))}, ${sqlInteiro(n(u.idUnidadeDerivada))}, ${sqlInteiro(n(u.cdUnidadeEmpregada))},
+                  ${sqlInteiro(n(u.cdUnidadeAplicacao))}, ${sqlTexto(unidade(u.sgGrandeza), 20)}, ${sqlTexto(semAcento(s(u.dsGrandeza)), 30)})`),
+    },
+    {
+      chave: 'embalagens', tabela: 'REC_UN_MEDIDAS_CIDASC', rotulo: 'as embalagens (agrotóxico medida)',
+      insert: (await lista('AgrotoxicoMedida/Pesquisar', 'agrotoxicoMedida', 'as embalagens')).map((m) =>
+        `INSERT INTO REC_UN_MEDIDAS_CIDASC (ID, IDAGROTOXICOMEDIDA, NRVALORUNITARIO, DSDESCRICAO)
+          VALUES (${sqlInteiro(n(m.idAgrotoxicoMedida))}, ${sqlInteiro(n(m.idAgrotoxicoMedida))}, ${sqlNumero(Number(m.nrValorUnitario) || 0)},
+                  ${sqlTexto(s(m.dsDescricao), 20)})`),
+    },
+  ];
+
+  const total: Record<string, string | number> = { ambiente: /homologacao/i.test(url) ? 'homologação' : 'produção' };
+  for (const t of tabelas) {
+    await executar(`DELETE FROM ${t.tabela}`);
+    await executarScript(t.insert, (f, tot) => progresso(`Gravando ${t.rotulo}`, f, tot));
+    total[t.chave] = t.insert.length;
+  }
+  return total;
 }

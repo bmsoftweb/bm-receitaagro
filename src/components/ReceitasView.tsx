@@ -22,6 +22,7 @@ import { Selecao } from './Selecao';
 import { Pesquisa } from './Pesquisa';
 import { BotaoAcao } from './MenuAcoes';
 import { BarraAbas } from './BarraAbas';
+import { usePaginacao } from './Paginacao';
 import {
   calcularQuantidade, calcularArea, doseValida, textoAplicacoes, tiposAplicacaoLiberados, acertaUnidade,
 } from '../../shared/receita';
@@ -1025,6 +1026,8 @@ export const ReceitasView: React.FC = () => {
     setAbas((prev) => prev.map((a) => (a.uid === uid && (a.id !== r.id || a.titulo !== titulo) ? { ...a, id: r.id, titulo } : a)));
   };
 
+  const paginacao = usePaginacao(lista, JSON.stringify(filtro));
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <BarraAbas rotulo="Receitas" total={lista.length} abas={abas.map((a) => ({ uid: a.uid, titulo: a.titulo, novo: !a.id }))}
@@ -1042,6 +1045,7 @@ export const ReceitasView: React.FC = () => {
       <div className={BARRA}>
         <div className={BARRA_INFO}>{loading ? 'Carregando…' : `${lista.length} receita(s)${truncado ? ' (mostrando as 500 mais recentes)' : ''}`}</div>
         <div className="flex items-center gap-2.5 shrink-0">
+          {paginacao.seletor}
           <Selecao value={filtro.art} onChange={(e) => setFiltro({ ...filtro, art: Number(e.target.value) })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} w-44`}>
             <option value={0}>Todas as ARTs</option>
             {apoio?.arts.map((a) => <option key={a.id} value={a.id}>{a.numero}</option>)}
@@ -1069,7 +1073,7 @@ export const ReceitasView: React.FC = () => {
                 {loading ? <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Carregando…</span>
                   : <div className="flex flex-col items-center gap-2"><Inbox className="w-8 h-8" /><span className="text-sm font-medium">Nenhuma receita no período</span></div>}
               </td></tr>
-            ) : lista.map((r) => (
+            ) : paginacao.visiveis.map((r) => (
               <tr key={r.id} className={TR} onDoubleClick={() => abrir(r.id)}>
                 <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
                 <td className={`${TD} text-center`}>{formatDateBR(r.data)}</td>
@@ -1097,7 +1101,7 @@ export const ReceitasView: React.FC = () => {
           </tbody>
         </table>
       </div>
-
+      {paginacao.rodape}
       </div>
       {imprimindo !== null && <Impressao id={imprimindo} onFechar={(ok) => { setImprimindo(null); if (ok) carregar(); }} />}
       {fechando !== null && (

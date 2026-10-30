@@ -14,6 +14,7 @@ import { NumberField } from './NumberField';
 import { Toggle } from './Toggle';
 import { Selecao } from './Selecao';
 import { BotaoAcao, MenuAcoes, SeparadorAcoes } from './MenuAcoes';
+import { usePaginacao } from './Paginacao';
 import { Opcao } from '../types';
 
 /**
@@ -203,6 +204,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
 
   const termo = busca.trim().toUpperCase();
   const filtrados = p.filtroLocal && termo ? lista.filter((t) => JSON.stringify(t).toUpperCase().includes(termo)) : lista;
+  const paginacao = usePaginacao(filtrados, busca);
   const podeEditar = !p.somenteLeitura;
   // O cabeçalho já está montado quando o efeito roda
   const [seloTitulo, setSeloTitulo] = useState<HTMLElement | null>(null);
@@ -321,6 +323,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
         <div className={BARRA_INFO}>{loading ? 'Carregando…' : `${filtrados.length} registro(s)`}</div>
         <div className="flex items-center gap-2.5 shrink-0">
           {p.barra}
+          {paginacao.seletor}
           <div className="relative w-52 sm:w-64 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
             <input type="text" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS} pl-9`} />
@@ -364,7 +367,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
                 </td>
               </tr>
             ) : (
-              filtrados.map((t) => (
+              paginacao.visiveis.map((t) => (
                 <tr key={t.id} className={TR} onDoubleClick={() => podeEditar && abrir({ ...t })}>
                   <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
                   {p.colunas.map((c) => <td key={c.titulo} className={`${TD} ${c.classe || ''}`}>{c.valor(t)}</td>)}
@@ -379,7 +382,7 @@ export function Cadastro<T extends { id: number }>(p: Props<T>) {
           </tbody>
         </table>
       </div>
-
+      {paginacao.rodape}
     </div>
 
       {fechando !== null && (

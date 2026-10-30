@@ -48,12 +48,17 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 - Assinatura digital com PFX (Chilkat), envio do PDF por FTP e QR code: a impressão é pelo
   navegador e mostra a chave do PDF em texto.
-- Impressão matricial, localidades e unidades do SIGEN (TfrmAtualizar), Zerar Estoque e Gerar
-  Padrões.
+- Impressão matricial, Zerar Estoque e Gerar Padrões.
 - Telas do compêndio antigo (ufrmDefensivos, ufrmCompendio, PesqDef, PesqPraga) e as tabelas
   ainda protegidas por senha (`REC_CULTURAS_PRAGAS_PRODUTOS`, `REC_UFS_RESTRICOES` e afins).
 
 ## Histórico
+
+### 0.0.12
+- Tabelas CIDASC com todas as tabelas que vêm do SIGEN (TfrmAtualizar): agrotóxicos, culturas,
+  pragas, localidades, tipos de logradouro, unidades de medida, unidades derivadas e embalagens.
+- Paginação nas grades (cadastros, Tabelas CIDASC, Receitas e Movimentos): registros por página
+  no cabeçalho e navegação no rodapé, como no crmWeb.
 
 ### 0.0.11
 - Nova opção Tabelas CIDASC no menu Compêndio: atualiza agrotóxicos, culturas e pragas pelo SIGEN
