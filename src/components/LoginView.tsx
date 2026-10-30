@@ -236,7 +236,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </form>
 
           <div className="flex items-center justify-between mt-8 pt-4 border-t border-stone-200 dark:border-stone-800 text-[10px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
-            <span>BM-ReceitaAgro by BMsoft Sistemas</span>
+            <span>BM-ReceitaAgro <span className="normal-case">v{__VERSAO__}</span> by BMsoft Sistemas</span>
             <span className="normal-case">© {new Date().getFullYear()} • Integração via bmAPI</span>
           </div>
         </div>

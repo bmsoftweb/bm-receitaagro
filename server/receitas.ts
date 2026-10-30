@@ -21,6 +21,27 @@ import {
 const s = (v: unknown) => String(v ?? '').trim();
 const n = (v: unknown) => Number(v || 0);
 
+/**
+ * Linha REC_DEFENSIVOS do produto NovoRec. Há produtos com várias linhas (duplicadas pelo Delphi):
+ * vale a que tem código CIDASC. Sem código, usa o agrotóxico da CIDASC com o mesmo registro MAPA,
+ * com ou sem zeros à esquerda (o Delphi grava "04012" como "4012"), mas só se o MAPA for de um
+ * agrotóxico só: ele se repete entre produtos.
+ */
+async function defensivoCidasc(idNovoRec: number) {
+  const def = await consultarUm(
+    'SELECT ID id_def, ID_CIDASC id_cidasc FROM REC_DEFENSIVOS WHERE ID_NOVOREC = :id ORDER BY id_cidasc DESC, id_def TOP 1',
+    { id: idNovoRec },
+  );
+  if (n(def?.id_cidasc)) return def;
+  const mapa = s((await consultarUm('SELECT REGISTRO_MAPA m FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id: idNovoRec }))?.m);
+  if (!mapa) return def;
+  const cidasc = await consultar(
+    'SELECT IDAGROTOXICO id FROM REC_DEFENSIVOS_CIDASC WHERE NRREGISTROMAPA IN (:a, :b)',
+    { a: mapa, b: mapa.replace(/^0+/, '') },
+  );
+  return cidasc.length === 1 ? { id_def: def?.id_def, id_cidasc: cidasc[0].id } : def;
+}
+
 /** Compêndio online liberado: token + compendio_online <> 'N' */
 async function tokenOnline(): Promise<string | null> {
   const c = await lerRecConfig();
@@ -598,10 +619,7 @@ export function createReceitasRouter() {
     const trat = await consultarUm(`${SQL_TRATAMENTO} WHERE A.ID = :id`, { id: Math.trunc(Number(b.idTratamento) || 0) });
     if (!trat) throw new BmapiError('Tratamento não encontrado. Refaça a escolha do produto.');
     const t = mapearTratamento(trat);
-    const def = await consultarUm(
-      'SELECT B.ID id_def, B.ID_CIDASC id_cidasc FROM REC_NOVOREC_DEFENSIVOS A LEFT JOIN REC_DEFENSIVOS B ON B.ID_NOVOREC = A.ID WHERE A.ID = :id',
-      { id: t.idProduto },
-    );
+    const def = await defensivoCidasc(t.idProduto);
     const cult = await consultarUm('SELECT ID_CIDASC c FROM REC_NOVOREC_CULTURAS WHERE ID = :id', { id: t.idCultura });
     const praga = await consultarUm('SELECT ID_CIDASC c FROM REC_NOVOREC_PRAGAS WHERE ID = :id', { id: t.idPraga });
 

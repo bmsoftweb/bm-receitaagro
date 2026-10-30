@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
-  consultar, consultarUm, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlNumero, sqlInteiro,
+  consultar, consultarUm, consultarComLimite, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlNumero, sqlInteiro,
+  sqlListaInteiros, tabelaMemoria,
 } from './bmapi.js';
 import { rota, texto, maiusculo, idParam, busca, semAcento } from './util.js';
 import { atualizarCatalogo, acertarTabelas, buscarTratamentosDoProduto } from './novorec.js';
@@ -73,6 +74,60 @@ export async function memosTratamento(id: number): Promise<Record<string, string
     out[m.toLowerCase()] = await lerMemo(`SELECT ${m} FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id`, { id });
   }
   return out;
+}
+
+/**
+ * Linhas repetidas do REC_DEFENSIVOS (mesmo ID_NOVOREC, criadas pela atualização do Delphi).
+ * Agrupa só pelo produto NovoRec: o mesmo ID_CIDASC pode valer para vários produtos.
+ * Fica a linha com mais dados (CIDASC, produto do ERP, manual); só sai a que não tem nada
+ * diferente dela e não veio do compêndio antigo (ID_INTEGRACAO/ID_IMP, usados em tabelas protegidas).
+ */
+async function duplicadosDefensivos() {
+  const m = tabelaMemoria('DD');
+  const linhas: any[] = [];
+  try {
+    await executar(`SELECT ID_NOVOREC, COUNT(*) N INTO ${m} FROM REC_DEFENSIVOS WHERE ID_NOVOREC IS NOT NULL GROUP BY ID_NOVOREC`);
+    // Em páginas pelo ID: a bmAPI corta resultados grandes
+    for (let ultimo = 0; ;) {
+      const pagina = await consultarComLimite(
+        `SELECT A.ID id, A.ID_NOVOREC nr, A.ID_BM id_bm, A.ID_CIDASC id_cidasc, A.ID_INTEGRACAO integ, A.ID_IMP imp, A.MANUAL manual
+           FROM REC_DEFENSIVOS A INNER JOIN ${m} M ON M.ID_NOVOREC = A.ID_NOVOREC
+          WHERE M.N > 1 AND A.ID > ${ultimo} ORDER BY id TOP 300`,
+      );
+      linhas.push(...pagina.rows);
+      if (pagina.truncated) throw new BmapiError('A bmAPI cortou a consulta dos duplicados; limpeza não feita.');
+      if (pagina.rows.length < 300) break;
+      ultimo = Number(pagina.rows[pagina.rows.length - 1].id);
+    }
+  } finally {
+    await executar(`DROP TABLE IF EXISTS ${m}`).catch(() => {});
+  }
+  const ids = linhas.map((r) => Number(r.id));
+  const comBm = new Set(ids.length
+    ? (await consultar(`SELECT ID_DEF id FROM REC_DEFENSIVOS_BM WHERE ID_DEF IN (${sqlListaInteiros(ids)}) GROUP BY ID_DEF`)).map((r) => Number(r.id))
+    : []);
+
+  const num = (v: unknown) => Number(v || 0);
+  const txt = (v: unknown) => String(v ?? '').trim();
+  const pontos = (r: any) =>
+    (num(r.id_cidasc) ? 8 : 0) + (num(r.id_bm) || comBm.has(num(r.id)) ? 4 : 0) + (txt(r.manual) === 'S' ? 2 : 0) + (txt(r.integ) || num(r.imp) ? 1 : 0);
+  const grupos = new Map<number, any[]>();
+  for (const r of linhas) grupos.set(num(r.nr), [...(grupos.get(num(r.nr)) || []), r]);
+
+  const limpezas: { fica: number; saem: number[] }[] = [];
+  let conflitos = 0;
+  for (const g of grupos.values()) {
+    const fica = [...g].sort((a, b) => pontos(b) - pontos(a) || num(a.id) - num(b.id))[0];
+    const outras = g.filter((r) => r !== fica);
+    const saem = outras.filter((r) =>
+      !txt(r.integ) && !num(r.imp)
+      && (!num(r.id_cidasc) || num(r.id_cidasc) === num(fica.id_cidasc))
+      && (!num(r.id_bm) || num(r.id_bm) === num(fica.id_bm))
+      && (txt(r.manual) !== 'S' || txt(fica.manual) === 'S'));
+    if (saem.length < outras.length) conflitos++;
+    if (saem.length) limpezas.push({ fica: num(fica.id), saem: saem.map((r) => num(r.id)) });
+  }
+  return { limpezas, produtos: grupos.size, conflitos };
 }
 
 export function createCompendioRouter() {
@@ -238,6 +293,25 @@ export function createCompendioRouter() {
   // ---- Ações da API e manutenção ----
   r.post('/defensivos/atualizar', rota(async (_req, res) => {
     res.json(await atualizarCatalogo());
+  }));
+
+  /** Prévia (?simular=S) ou limpeza das linhas repetidas do REC_DEFENSIVOS */
+  r.post('/defensivos/limpar-duplicados', rota(async (req, res) => {
+    const { limpezas, produtos, conflitos } = await duplicadosDefensivos();
+    const linhas = limpezas.reduce((t, l) => t + l.saem.length, 0);
+    if (req.query.simular !== 'S') {
+      // Quem apontava para a linha apagada passa a apontar para a que fica
+      await executarScript(limpezas.flatMap(({ fica, saem }) => {
+        const lista = sqlListaInteiros(saem);
+        return [
+          `UPDATE REC_DEFENSIVOS_BM SET ID_DEF = ${fica} WHERE ID_DEF IN (${lista})`,
+          `UPDATE REC_RECEITAS_PRO SET ID_DEFENSIVO = ${fica} WHERE ID_DEFENSIVO IN (${lista})`,
+          `UPDATE REC_DEFENSIVOS_ANEXOS SET ID_DEF = ${fica} WHERE ID_DEF IN (${lista})`,
+          `DELETE FROM REC_DEFENSIVOS WHERE ID IN (${lista})`,
+        ];
+      }));
+    }
+    res.json({ produtos, linhas, conflitos });
   }));
 
   r.post('/defensivos/acertar-tabelas', rota(async (_req, res) => {

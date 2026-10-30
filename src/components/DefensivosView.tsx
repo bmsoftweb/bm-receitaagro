@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Package, Link2, ListChecks, CloudDownload, Eraser, Copy, RefreshCw, Wrench, Loader2, Plus, Trash2, Save, Pencil,
+  Package, Link2, ListChecks, CloudDownload, Eraser, Copy, RefreshCw, Wrench, Loader2, Plus, Trash2, Save, Pencil, Layers,
 } from 'lucide-react';
 import { get, send, qs } from '../services/api';
 import { Cadastro } from './Cadastro';
@@ -276,6 +276,7 @@ export const DefensivosView: React.FC = () => {
   const [recarga, setRecarga] = useState(0);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [duplicados, setDuplicados] = useState<{ produtos: number; linhas: number; conflitos: number } | null>(null);
 
   const acaoGeral = async (nome: string, url: string, msg: (r: any) => string) => {
     try {
@@ -289,6 +290,24 @@ export const DefensivosView: React.FC = () => {
     }
   };
   const fechar = () => { setDialogo(null); setRecarga((n) => n + 1); };
+
+  /** Primeiro a prévia (nada é apagado), depois a confirmação */
+  const verDuplicados = async () => {
+    try {
+      setOcupado('duplicados');
+      const r = await send<{ produtos: number; linhas: number; conflitos: number }>('POST', '/api/defensivos/limpar-duplicados?simular=S');
+      if (r.linhas) setDuplicados(r);
+      else toast(r.conflitos ? `Nenhuma linha a apagar; ${r.conflitos} produto(s) com linhas de dados diferentes ficam como estão.` : 'Nenhuma linha duplicada.');
+    } catch (e: any) {
+      setAviso(e.message);
+    } finally {
+      setOcupado(null);
+    }
+  };
+  const limparDuplicados = async () => {
+    setDuplicados(null);
+    await acaoGeral('duplicados', '/api/defensivos/limpar-duplicados', (r) => `${r.linhas} linha(s) duplicada(s) apagada(s).`);
+  };
 
   return (
     <>
@@ -305,6 +324,9 @@ export const DefensivosView: React.FC = () => {
           </button>
           <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoGeral('acertar', '/api/defensivos/acertar-tabelas', () => 'Tabelas acertadas.')} title="Refazer os vínculos entre culturas, pragas e produtos" className={BTN_SECUNDARIO}>
             {ocupado === 'acertar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}Acertar tabelas
+          </button>
+          <button type="button" disabled={Boolean(ocupado)} onClick={verDuplicados} title="Apagar as linhas repetidas do mesmo produto na ponte REC_DEFENSIVOS" className={BTN_SECUNDARIO}>
+            {ocupado === 'duplicados' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}Limpar duplicados
           </button>
         </>}
         colunas={[
@@ -344,6 +366,19 @@ export const DefensivosView: React.FC = () => {
       {dialogo?.tipo === 'bm' && <ProdutosErpModal def={dialogo.def} onFechar={fechar} />}
       {dialogo?.tipo === 'cidasc' && <CidascModal def={dialogo.def} onFechar={fechar} />}
       {dialogo?.tipo === 'trat' && <TratamentosModal def={dialogo.def} onFechar={fechar} />}
+      {duplicados && (
+        <ConfirmModal
+          titulo="Limpar duplicados"
+          mensagem={<>
+            Apagar <strong>{duplicados.linhas}</strong> linha(s) repetida(s) de {duplicados.produtos} produto(s)? Fica em cada produto a linha com
+            código CIDASC e produto do ERP; associações e receitas passam para ela.
+            {duplicados.conflitos > 0 && <> {duplicados.conflitos} produto(s) têm linhas com dados diferentes (outro código CIDASC ou produto do ERP), que ficam como estão.</>}
+          </>}
+          textoConfirmar="Apagar duplicados"
+          onConfirmar={limparDuplicados}
+          onCancelar={() => setDuplicados(null)}
+        />
+      )}
     </>
   );
 };

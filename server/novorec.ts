@@ -1,4 +1,4 @@
-import { consultar, executar, executarScript, BmapiError, sqlTexto, sqlNumero, sqlInteiro, agoraISO, sqlDataHora } from './bmapi.js';
+import { consultar, executar, executarScript, BmapiError, sqlTexto, sqlNumero, sqlInteiro, agoraISO, sqlDataHora, tabelaMemoria } from './bmapi.js';
 import { lerRecConfig } from './cadastros.js';
 import { semAcento } from './util.js';
 
@@ -210,17 +210,31 @@ export async function atualizarCatalogo(): Promise<{ defensivos: number; cultura
       : `INSERT INTO REC_NOVOREC_DEFENSIVOS (ID, NOME, REGISTRO_MAPA, ATIVO) VALUES (${id}, ${nome}, ${mapa}, ${ativo})`;
   }));
 
-  // Ponte REC_DEFENSIVOS por registro MAPA e código CIDASC (só onde não foi ajustado à mão)
-  await executarScript([
-    `UPDATE REC_DEFENSIVOS A SET ID_NOVOREC = B.ID FROM REC_DEFENSIVOS A
-       INNER JOIN REC_NOVOREC_DEFENSIVOS B ON B.REGISTRO_MAPA = A.ID_MAPA`,
-    `INSERT INTO REC_DEFENSIVOS (ID_NOVOREC, ID_MAPA)
-       SELECT B.ID, B.REGISTRO_MAPA FROM REC_NOVOREC_DEFENSIVOS B
-        WHERE B.ID NOT IN (SELECT ID_NOVOREC FROM REC_DEFENSIVOS WHERE ID_NOVOREC IS NOT NULL)`,
-    `UPDATE REC_DEFENSIVOS A SET ID_CIDASC = C.IDAGROTOXICO FROM REC_DEFENSIVOS A
-       INNER JOIN REC_DEFENSIVOS_CIDASC C ON C.NRREGISTROMAPA = A.ID_MAPA
-      WHERE (A.MANUAL IS NULL OR A.MANUAL <> 'S')`,
-  ]);
+  // Ponte REC_DEFENSIVOS por registro MAPA e código CIDASC (só onde não foi ajustado à mão).
+  // O MAPA se repete entre produtos (na API e na tabela da CIDASC): só liga quando ele é de um
+  // produto só, e só linhas ainda sem produto (sobrescrever juntava produtos diferentes e o INSERT
+  // abaixo recriava os outros a cada atualização).
+  const [mapasNr, mapasCidasc] = [tabelaMemoria('MN'), tabelaMemoria('MC')];
+  try {
+    await executarScript([
+      `SELECT REGISTRO_MAPA MAPA, COUNT(*) N INTO ${mapasNr} FROM REC_NOVOREC_DEFENSIVOS GROUP BY REGISTRO_MAPA`,
+      `SELECT NRREGISTROMAPA MAPA, COUNT(*) N INTO ${mapasCidasc} FROM REC_DEFENSIVOS_CIDASC GROUP BY NRREGISTROMAPA`,
+      `UPDATE REC_DEFENSIVOS A SET ID_NOVOREC = B.ID FROM REC_DEFENSIVOS A
+         INNER JOIN REC_NOVOREC_DEFENSIVOS B ON B.REGISTRO_MAPA = A.ID_MAPA
+         INNER JOIN ${mapasNr} U ON U.MAPA = B.REGISTRO_MAPA
+        WHERE A.ID_NOVOREC IS NULL AND A.ID_MAPA <> '' AND U.N = 1`,
+      `INSERT INTO REC_DEFENSIVOS (ID_NOVOREC, ID_MAPA)
+         SELECT B.ID, B.REGISTRO_MAPA FROM REC_NOVOREC_DEFENSIVOS B
+          WHERE B.ID NOT IN (SELECT ID_NOVOREC FROM REC_DEFENSIVOS WHERE ID_NOVOREC IS NOT NULL)`,
+      `UPDATE REC_DEFENSIVOS A SET ID_CIDASC = C.IDAGROTOXICO FROM REC_DEFENSIVOS A
+         INNER JOIN REC_DEFENSIVOS_CIDASC C ON C.NRREGISTROMAPA = A.ID_MAPA
+         INNER JOIN ${mapasCidasc} U ON U.MAPA = C.NRREGISTROMAPA
+        WHERE (A.MANUAL IS NULL OR A.MANUAL <> 'S') AND A.ID_MAPA <> '' AND U.N = 1`,
+    ]);
+  } finally {
+    await executar(`DROP TABLE IF EXISTS ${mapasNr};
+DROP TABLE IF EXISTS ${mapasCidasc}`).catch(() => {});
+  }
 
   // Culturas e pragas
   const upsertNomes = async (tabela: string, caminho: string) => {

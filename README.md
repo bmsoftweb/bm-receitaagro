@@ -55,6 +55,14 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.9
+- Versão do sistema no rodapé da tela de login.
+- Atualizar da API (Defensivos): só liga pelo registro MAPA quando ele é de um produto só (na API e
+  na tabela da CIDASC) e não sobrescreve vínculos existentes; deixava de criar linhas repetidas.
+- Receita usa a linha do defensivo com código CIDASC (ou o agrotóxico de MAPA único na CIDASC).
+- Botão "Limpar duplicados" nos Defensivos: apaga as linhas repetidas do mesmo produto no
+  REC_DEFENSIVOS, mantendo a que tem mais dados e repassando associações e receitas.
+
 ### 0.0.8
 - Nova tela Movimento CIDASC (envio do movimento de agrotóxicos ao SIGEN, como no receita_e.exe):
   gerar e gravar o movimento do período, enviar ou cancelar itens e excluir os não enviados.
