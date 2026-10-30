@@ -54,6 +54,11 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.16
+- Atualizar da API: quando o site do Novo Receituário bloqueia o acesso por alguns minutos (página do
+  Cloudflare, HTTP 403/429, normalmente por muitas consultas seguidas), o aviso diz isso e orienta a
+  esperar, em vez de dizer que o token foi recusado.
+
 ### 0.0.15
 - Erros do envio da receita à CIDASC com "Como resolver": cada consistência diz a tela e o campo a
   corrigir, e as recusas do SIGEN (login, receita já enviada, cancelamento, 404 e demais) trazem a

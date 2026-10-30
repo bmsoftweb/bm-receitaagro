@@ -31,8 +31,11 @@ async function getJson(url: string, token: string): Promise<any> {
   if (res.status === 401 || res.status === 403) {
     // Motivo que a API devolve (token inválido, assinatura vencida...), sem repetir o token
     const motivo = (await res.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 200);
+    // Página HTML = bloqueio do Cloudflare do site (excesso de requisições), não recusa do token
+    if (motivo.startsWith('<')) throw new BmapiError(`O site do Novo Receituário bloqueou o acesso temporariamente (HTTP ${res.status}, proteção Cloudflare, normalmente por muitas consultas seguidas). Como resolver: aguarde alguns minutos e tente de novo; o token está correto.`, 503);
     throw new BmapiError(`A API do Novo Receituário recusou o token (rec_config.tokenId_novorec): HTTP ${res.status}${motivo ? ` - ${motivo}` : ''}.`, 503);
   }
+  if (res.status === 429) throw new BmapiError('O site do Novo Receituário limitou as consultas (HTTP 429). Como resolver: aguarde alguns minutos e tente de novo.', 503);
   if (!res.ok) throw new BmapiError(`API do Novo Receituário respondeu HTTP ${res.status}.`, 503);
   return res.json();
 }
