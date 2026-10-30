@@ -198,6 +198,14 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
         'Corrija o local da aplicação nos dados iniciais da receita. "Usar minha localização" só serve quando você está na propriedade.',
       );
     }
+    if (/unidade derivada incorreta/i.test(msg)) {
+      throw new BmapiError(
+        `${msg}
+A UN da dose de um dos produtos não combina com a formulação do agrotóxico (líquido × sólido). ` +
+        'Altere o produto na receita e troque a UN da dose: produto líquido usa L ou mL (ex.: L/ha, mL/100 L), sólido usa kg ou g ' +
+        '(ex.: kg/ha, g/100 L); confira o valor da dose na bula. Se a unidade já está certa, confira o vínculo CIDASC do defensivo na tela Defensivos.',
+      );
+    }
     throw new BmapiError(msg);
   }
 

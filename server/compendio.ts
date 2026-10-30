@@ -347,6 +347,19 @@ export function createCompendioRouter() {
     res.json({ ok: true });
   }));
 
+  /** Defensivos ativos, para o "Buscar tratamentos" de todos (a tela chama um por um) */
+  r.get('/defensivos/ativos', rota(async (_req, res) => {
+    const linhas: any[] = [];
+    for (let ultimo = -1; ;) {
+      const pagina = await consultarComLimite(`SELECT ID id, NOME nome, ATIVO ativo FROM REC_NOVOREC_DEFENSIVOS WHERE ID > ${ultimo} ORDER BY id TOP 500`);
+      if (pagina.truncated) throw new BmapiError('A bmAPI cortou a leitura dos defensivos.');
+      linhas.push(...pagina.rows);
+      if (pagina.rows.length < 500) break;
+      ultimo = Number(pagina.rows[pagina.rows.length - 1].id);
+    }
+    res.json(linhas.filter((d) => d.ativo !== false).map((d) => ({ id: Number(d.id), nome: String(d.nome || '').trim() })));
+  }));
+
   r.post('/defensivos/:id/buscar-tratamentos', rota(async (req, res) => {
     res.json({ consultas: await buscarTratamentosDoProduto(idParam(req)) });
   }));

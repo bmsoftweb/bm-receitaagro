@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Pencil, Trash2, Printer, RefreshCw, Loader2, Save, ChevronRight, Lock, Inbox, MapPin,
-  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy, ClipboardPaste,
+  Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy, ClipboardPaste, AlertTriangle,
 } from 'lucide-react';
 import { get, send, qs } from '../services/api';
 import { Opcao, Receita, ProdutoReceita, Tratamento } from '../types';
@@ -35,6 +35,37 @@ interface Apoio {
   unCidasc: { id: number; sigla: string; descricao: string }[];
   tiposAplicacao: Opcao[];
   compendioOnline: boolean;
+}
+
+/** Unidades da CIDASC de produto líquido e de sólido (o SIGEN recusa a dose em volume para sólido e vice-versa) */
+const VOLUME = ['L', 'ML', 'M³', '1KLT', 'LOLE'];
+const MASSA = ['KG', 'T', 'G', 'MG'];
+type Estado = 'líquido' | 'sólido' | '';
+const estadoUn = (apoio: Apoio, idUn: number): Estado => {
+  const s = apoio.unCidasc.find((u) => u.id === idUn)?.sigla.toUpperCase() || '';
+  return VOLUME.includes(s) ? 'líquido' : MASSA.includes(s) ? 'sólido' : '';
+};
+const TROCA: Record<string, string> = { kg: 'l', l: 'kg', g: 'ml', ml: 'g' };
+/**
+ * UN da dose que não combina com a UN a adquirir ("Unidade Derivada incorreta para a formulação do
+ * agrotóxico" no SIGEN): devolve o estado de cada uma e uma unidade que serve — a da recomendação do
+ * tratamento, se combinar, senão a equivalente (kg↔L, g↔mL, mesmo "por").
+ */
+function conferirUnDose(apoio: Apoio, idUnDose: number, idUnQtd: number, recomendada = '') {
+  const dose = apoio.unDerivadas.find((u) => u.id === idUnDose);
+  const eDose = dose ? estadoUn(apoio, dose.idEmpregada) : '';
+  const eQtd = estadoUn(apoio, idUnQtd);
+  if (!dose || !eDose || !eQtd || eDose === eQtd) return null;
+  // Sem espaços: "g/100 L" acha "g/100l agua"; exata primeiro, senão a mais curta que começa igual
+  const junto = (x: string) => acertaUnidade(x).replace(/\s/g, '');
+  const achar = (alvo: string) => {
+    const ok = apoio.unDerivadas.filter((u) => estadoUn(apoio, u.idEmpregada) === eQtd && junto(u.un).startsWith(alvo));
+    return ok.find((u) => junto(u.un) === alvo) || ok.sort((a, b) => a.un.length - b.un.length)[0];
+  };
+  const [antes, ...resto] = junto(dose.un).split('/');
+  const troca = TROCA[antes];
+  const sugestao = (recomendada && achar(junto(recomendada))) || (troca ? achar([troca, ...resto].join('/')) : undefined);
+  return { dose: dose.un, eDose, eQtd, sugestao };
 }
 
 /** Erro com "x" e fechamento automático (AvisoErro do crmWeb) */
@@ -168,10 +199,12 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
     setEsc((e) => ({ ...e, tratamento: t }));
     const unDose = apoio.unDerivadas.find((u) => acertaUnidade(u.un) === acertaUnidade(t.unidadeAplicacao));
     const sigla = (esc.produto?.un || t.unidadeAplicacao.split('/')[0] || '').trim().toUpperCase();
+    const idUnQtd = apoio.unCidasc.find((u) => u.sigla.toUpperCase() === sigla)?.id || 0;
+    const idUnDose = conferirUnDose(apoio, unDose?.id || 0, idUnQtd, t.unidadeAplicacao)?.sugestao?.id || unDose?.id || 0;
     setF((x) => ({
       ...x,
-      dose: t.doseMaxima || t.doseMinima, idUnDose: unDose?.id || 0, calda: t.volumeCalda, nrAplic: t.minimoAplicacoes || 1,
-      idUnQtd: apoio.unCidasc.find((u) => u.sigla.toUpperCase() === sigla)?.id || 0,
+      dose: t.doseMaxima || t.doseMinima, idUnDose, calda: t.volumeCalda, nrAplic: t.minimoAplicacoes || 1,
+      idUnQtd,
       idUnArea: apoio.unCidasc.find((u) => u.sigla.toUpperCase() === 'HA')?.id || 0,
       carencia: t.intervaloSeguranca ? `${t.intervaloSeguranca} DIAS` : '',
       aplicacao: textoAplicacoes(t.minimoAplicacoes, t.maximoAplicacoes, t.localAplicacao).slice(0, 120),
@@ -187,6 +220,7 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
   const unQtd = apoio.unCidasc.find((u) => u.id === f.idUnQtd)?.sigla || '';
   const liberados = useMemo(() => (t ? tiposAplicacaoLiberados(apoio.tiposAplicacao, t.restricaoAplicacao, t.volumeCaldaAerea) : []), [t?.id]);
   const dadosCalc = { dose: f.dose, unDose, unAdquirir: unQtd, calda: f.calda, nrAplic: f.nrAplic };
+  const unIncompativel = conferirUnDose(apoio, f.idUnDose, f.idUnQtd, t?.unidadeAplicacao);
   const doseOk = t ? doseValida(f.dose, unDose, t.doseMinima, t.doseMaxima, t.unidadeAplicacao) : false;
 
   const calcQtd = (area = f.area) => {
@@ -344,6 +378,24 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
                 {apoio.unCidasc.map((u) => <option key={u.id} value={u.id}>{u.sigla} – {u.descricao}</option>)}
               </Selecao>
             </Campo>
+            {unIncompativel && (
+              <div className="col-span-4 text-[11px] p-2 rounded border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
+                <div className="flex-1">
+                  A UN da dose <b>{unIncompativel.dose}</b> é de produto <b>{unIncompativel.eDose}</b>, mas a UN a adquirir é de produto <b>{unIncompativel.eQtd}</b>.
+                  O SIGEN recusa com "Unidade Derivada incorreta para a formulação do agrotóxico".{' '}
+                  {unIncompativel.sugestao
+                    ? <>Troque a UN da dose para <b>{unIncompativel.sugestao.un}</b> e confira o valor da dose na bula</>
+                    : <>Escolha uma UN da dose em {unIncompativel.eQtd === 'líquido' ? 'volume (L ou mL)' : 'peso (kg ou g)'} e confira o valor da dose na bula</>}
+                  {' '}— ou, se o produto é {unIncompativel.eDose}, corrija a UN a adquirir.
+                </div>
+                {unIncompativel.sugestao && (
+                  <button type="button" onClick={() => setF({ ...f, idUnDose: unIncompativel.sugestao!.id })} className="shrink-0 px-2 py-1 rounded border border-amber-400 dark:border-amber-700 font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40 cursor-pointer">
+                    Usar {unIncompativel.sugestao.un}
+                  </button>
+                )}
+              </div>
+            )}
             <Campo rotulo="Carência" className="col-span-2 sm:col-span-1">
               <input maxLength={25} value={f.carencia} onChange={(e) => setF({ ...f, carencia: e.target.value })} className={`${INPUT_CLASS} ${FIELD_WRAPPER_CLASS}`} />
             </Campo>

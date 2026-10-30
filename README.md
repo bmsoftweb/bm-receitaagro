@@ -54,6 +54,14 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.14
+- Defensivos: botão Buscar tratamentos para todos os defensivos ativos de uma vez, com barra de
+  progresso e botão Parar (um produto por chamada; o que já foi feito fica gravado).
+- Produto da receita: aviso quando a UN da dose não combina com a UN a adquirir (líquido × sólido),
+  que o SIGEN recusa com "Unidade Derivada incorreta para a formulação do agrotóxico", com botão para
+  usar a unidade sugerida. O assistente já escolhe a unidade compatível e a mensagem do SIGEN explica
+  o que corrigir.
+
 ### 0.0.13
 - Coluna indicadora (">") nas grades das Tabelas CIDASC, como nas outras listas.
 

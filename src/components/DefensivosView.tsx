@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Package, Link2, ListChecks, CloudDownload, Eraser, Copy, RefreshCw, Wrench, Loader2, Plus, Trash2, Save, Pencil, Layers,
 } from 'lucide-react';
@@ -8,7 +8,8 @@ import { Modal } from './Modal';
 import { AvisoErro } from './AvisoErro';
 import { toast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
-import { useProgresso } from './ProgressoModal';
+import { useProgresso, ProgressoModal } from './ProgressoModal';
+import { Andamento } from '../services/api';
 import { NumberField } from './NumberField';
 import { Pesquisa } from './Pesquisa';
 import { Opcao, Tratamento } from '../types';
@@ -284,6 +285,40 @@ export const DefensivosView: React.FC = () => {
   const [aviso, setAviso] = useState<string | null>(null);
   const [duplicados, setDuplicados] = useState<{ produtos: number; linhas: number; conflitos: number } | null>(null);
   const progresso = useProgresso();
+  const [confirmarTodos, setConfirmarTodos] = useState(false);
+  const [lote, setLote] = useState<Andamento | null>(null);
+  const parar = useRef(false);
+
+  /** Buscar tratamentos de todos os defensivos ativos: um por chamada, para não estourar o tempo da rota */
+  const buscarTodos = async () => {
+    setConfirmarTodos(false);
+    setOcupado('todos');
+    parar.current = false;
+    try {
+      setLote({ etapa: 'Lendo os defensivos', feitos: 0, total: 0 });
+      const defs = await get<{ id: number; nome: string }[]>('/api/defensivos/ativos');
+      let feitos = 0, tratamentos = 0, erros = 0, seguidos = 0;
+      for (const d of defs) {
+        if (parar.current) break;
+        setLote({ etapa: d.nome, feitos, total: defs.length });
+        try {
+          tratamentos += (await send<{ consultas: number }>('POST', `/api/defensivos/${d.id}/buscar-tratamentos`)).consultas;
+          seguidos = 0;
+        } catch (e: any) {
+          erros++;
+          if (++seguidos >= 5) throw new Error(`Parou depois de 5 erros seguidos (${feitos} de ${defs.length} feitos): ${e.message}`);
+        }
+        feitos++;
+      }
+      toast(`${parar.current ? 'Interrompido: ' : ''}tratamentos de ${feitos} de ${defs.length} defensivo(s) atualizados (${tratamentos} tratamento(s)${erros ? `, ${erros} defensivo(s) com erro` : ''}).`);
+    } catch (e: any) {
+      setAviso(e.message);
+    } finally {
+      setLote(null);
+      setOcupado(null);
+      setRecarga((n) => n + 1);
+    }
+  };
 
   const acaoGeral = async (nome: string, url: string, msg: (r: any) => string) => {
     try {
@@ -341,6 +376,9 @@ export const DefensivosView: React.FC = () => {
           <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoProgresso('api', 'Atualizando da API do Novo Receituário', '/api/defensivos/atualizar', (r: { defensivos: number; culturas: number; pragas: number; desde: string }) => `Catálogo atualizado${r.desde ? ` (alterações desde ${r.desde.split('-').reverse().join('/')})` : ''}: ${r.defensivos} defensivo(s), ${r.culturas} cultura(s) e ${r.pragas} praga(s).`)} title="Baixar produtos, culturas e pragas do Novo Receituário" className={BTN_SECUNDARIO}>
             {ocupado === 'api' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Atualizar da API
           </button>
+          <button type="button" disabled={Boolean(ocupado)} onClick={() => setConfirmarTodos(true)} title="Baixar as dosagens de todos os defensivos ativos na API do Novo Receituário" className={BTN_SECUNDARIO}>
+            {ocupado === 'todos' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudDownload className="w-3.5 h-3.5" />}Buscar tratamentos
+          </button>
           <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoGeral('acertar', '/api/defensivos/acertar-tabelas', () => 'Tabelas acertadas.')} title="Refazer os vínculos entre culturas, pragas e produtos" className={BTN_SECUNDARIO}>
             {ocupado === 'acertar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}Acertar tabelas
           </button>
@@ -386,6 +424,16 @@ export const DefensivosView: React.FC = () => {
       {dialogo?.tipo === 'cidasc' && <CidascModal def={dialogo.def} onFechar={fechar} />}
       {dialogo?.tipo === 'trat' && <TratamentosModal def={dialogo.def} onFechar={fechar} />}
       {progresso.modal}
+      {lote && <ProgressoModal titulo="Buscando os tratamentos de todos os defensivos" andamento={lote} onParar={() => { parar.current = true; setLote({ ...lote, etapa: 'Parando depois deste defensivo…' }); }} />}
+      {confirmarTodos && (
+        <ConfirmModal
+          titulo="Buscar tratamentos"
+          mensagem={<>Buscar na API os tratamentos de <strong>todos os defensivos ativos</strong>? São milhares de produtos e pode levar horas; dá para parar a qualquer momento e o que já foi feito fica gravado.</>}
+          textoConfirmar="Buscar tratamentos"
+          onConfirmar={buscarTodos}
+          onCancelar={() => setConfirmarTodos(false)}
+        />
+      )}
       {duplicados && (
         <ConfirmModal
           titulo="Limpar duplicados"

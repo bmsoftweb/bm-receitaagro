@@ -4,7 +4,7 @@ import { sendProgresso, Andamento } from '../services/api';
 import { Modal } from './Modal';
 
 /** Andamento de uma atualização longa; sem total, a barra fica correndo */
-export const ProgressoModal: React.FC<{ titulo: string; andamento: Andamento | null }> = ({ titulo, andamento }) => {
+export const ProgressoModal: React.FC<{ titulo: string; andamento: Andamento | null; onParar?: () => void }> = ({ titulo, andamento, onParar }) => {
   const pct = andamento?.total ? Math.round((andamento.feitos / andamento.total) * 100) : null;
   return (
     <Modal isOpen onClose={() => {}} title={titulo} subtitle="Aguarde até terminar" size="sm">
@@ -19,6 +19,11 @@ export const ProgressoModal: React.FC<{ titulo: string; andamento: Andamento | n
             ? <div className="h-full bg-amber-600 transition-[width] duration-300" style={{ width: `${pct}%` }} />
             : <div className="h-full w-1/3 bg-amber-600 rounded-full animate-[progresso_1.2s_ease-in-out_infinite]" />}
         </div>
+        {onParar && (
+          <div className="flex justify-end pt-2">
+            <button type="button" onClick={onParar} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer">Parar</button>
+          </div>
+        )}
       </div>
     </Modal>
   );
