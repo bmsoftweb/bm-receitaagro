@@ -54,6 +54,15 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.15
+- Erros do envio da receita à CIDASC com "Como resolver": cada consistência diz a tela e o campo a
+  corrigir, e as recusas do SIGEN (login, receita já enviada, cancelamento, 404 e demais) trazem a
+  orientação.
+- Movimento CIDASC: cada recusa do SIGEN mostra na grade e no aviso do envio o que corrigir (item já
+  lançado, produto sem vínculo, embalagem, venda sem receita, devolução sem a nota de origem, lote sem
+  entrada ou sem saldo, data anterior ao ajuste, tipo de operação, compra sem lote).
+- Aviso de erro com dica só fecha no "x"; os demais continuam fechando sozinhos em 10 segundos.
+
 ### 0.0.14
 - Defensivos: botão Buscar tratamentos para todos os defensivos ativos de uma vez, com barra de
   progresso e botão Parar (um produto por chamada; o que já foi feito fica gravado).

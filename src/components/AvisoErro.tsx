@@ -11,14 +11,17 @@ interface AvisoErroProps {
 
 /** Tempo que o aviso fica na tela antes de se fechar sozinho */
 const SEGUNDOS = 10;
+/** Aviso com "Como resolver" fica até o usuário fechar no "x" */
+const temDica = (texto: string) => /como resolver/i.test(texto);
 
-/** Aviso de erro de uma ação: fecha no "x" ou sozinho depois de 10 segundos */
+/** Aviso de erro de uma ação: fecha no "x" ou sozinho depois de 10 segundos (com dica, só no "x") */
 export const AvisoErro: React.FC<AvisoErroProps> = ({ mensagem, onFechar, className = '' }) => {
   // Em ref para o relógio não reiniciar a cada render de quem usa o aviso
   const fechar = useRef(onFechar);
   fechar.current = onFechar;
 
   useEffect(() => {
+    if (temDica(mensagem)) return;
     const t = setTimeout(() => fechar.current(), SEGUNDOS * 1000);
     return () => clearTimeout(t);
   }, [mensagem]);
@@ -29,7 +32,7 @@ export const AvisoErro: React.FC<AvisoErroProps> = ({ mensagem, onFechar, classN
       className={`${className} p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300`}
     >
       <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-      <span className="flex-1 min-w-0">{mensagem}</span>
+      <span className="flex-1 min-w-0 whitespace-pre-line">{mensagem}</span>
       <button
         type="button"
         onClick={onFechar}

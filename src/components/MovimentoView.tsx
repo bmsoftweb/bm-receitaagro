@@ -19,7 +19,7 @@ import { usePaginacao } from './Paginacao';
 interface Mestre { id: number; geradoEm: string; dataInicial: string; dataFinal: string; total: number; enviados: number; erros: number }
 interface Item {
   id: number; tipo: string; natureza: string; serie: string; numero: number; documento: string; pessoa: string; data: string;
-  lote: string; produto: string; un: string; qtd: number; receita: string; statusEnvio: string; statusCanc: string; mensagem: string;
+  lote: string; produto: string; un: string; qtd: number; receita: string; statusEnvio: string; statusCanc: string; mensagem: string; dica?: string;
 }
 type Aba = AbaAberta & { id: number };
 
@@ -73,7 +73,12 @@ const Itens: React.FC<{ itens: Item[]; carregando: boolean; vazio: string; acoes
             <td className={`${TD} text-center`}>{i.un}</td>
             <td className={`${TD} font-mono`}>{i.receita}</td>
             {acoes && <td className={`${TD} text-center`}><Situacao i={i} /></td>}
-            {acoes && <td className={`${TD} max-w-96 truncate`} title={i.mensagem}>{i.mensagem}</td>}
+            {acoes && (
+              <td className={`${TD} max-w-96`} title={i.mensagem}>
+                <div className="truncate">{i.mensagem}</div>
+                {i.dica && <div className="text-[11px] whitespace-normal text-amber-700 dark:text-amber-400">{i.dica}</div>}
+              </td>
+            )}
             {acoes && <td className={TD_ACOES}><div className="inline-flex items-center gap-1">{acoes(i)}</div></td>}
           </tr>
         ))}

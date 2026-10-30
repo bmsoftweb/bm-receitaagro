@@ -4,7 +4,7 @@ import {
   consultar, consultarUm, executar, executarScript, BmapiError, sqlTexto, sqlNumero, sqlInteiro, sqlData,
   sqlListaInteiros, tabelaMemoria, hojeISO, agoraISO,
 } from './bmapi.js';
-import { rota, idParam } from './util.js';
+import { rota, idParam, semAcento } from './util.js';
 import { lerRecConfig } from './cadastros.js';
 import { chamar, loginSigen, mensagens } from './cidasc.js';
 
@@ -121,6 +121,34 @@ async function gerar(d1: string, d2: string) {
   }
 }
 
+/** O que o usuário corrige para cada recusa conhecida do SIGEN (mensagens vistas nos envios gravados) */
+const DICAS: [RegExp, string][] = [
+  [/ja existe uma movimentacao|ja foi lancada no sistema|correspondem a uma movimentacao existente/,
+    'O item já está no SIGEN (enviado antes, talvez pelo sistema antigo): não precisa reenviar. Se o lançamento de lá estiver errado, cancele no SIGEN.'],
+  [/codigo da medida do agrotoxico/,
+    'Falta a embalagem CIDASC no cadastro do produto no ERP (ou ela não vale para este agrotóxico): corrija a embalagem e gere o movimento de novo.'],
+  [/codigo do agrotoxico|agrotoxico nao informado/,
+    'Produto do ERP sem vínculo com a CIDASC: em Defensivos, associe o produto ("Produtos do ERP") e confira o "Vincular CIDASC"; depois gere o movimento de novo.'],
+  [/numero do art|receituario (tem que ser informado|e obrigatorio)|numero do receituario/,
+    'Venda sem receita: vincule a receita (já enviada à CIDASC, com número) à venda no ERP e gere o movimento de novo.'],
+  [/movimentacao de saida do tipo venda/,
+    'A venda desta devolução não está no SIGEN: envie a venda antes e depois a devolução.'],
+  [/movimentacao de entrada do tipo compra/,
+    'A compra desta devolução não está no SIGEN: envie a compra antes e depois a devolução.'],
+  [/entrada no estoque|com a embalagem codigo|maior que o saldo/,
+    'O SIGEN não tem entrada (compra) deste lote/embalagem ou o saldo não basta: envie antes a compra do lote e confira se lote e embalagem são iguais na compra e na venda.'],
+  [/ajuste de saldo|nao pode ser menor que/,
+    'Movimento anterior ao ajuste de saldo feito no SIGEN: não é aceito. Se o saldo lá já considera este movimento, ignore o item.'],
+  [/tipo operacao (incorreto|nao valida)/,
+    'O SIGEN não aceita esse tipo de operação para a nota (ex.: entrada que não é compra): confira a natureza/tipo de operação da nota no ERP.'],
+  [/lote 0|lote nao informado/,
+    'Compra sem lote: informe o lote na nota de entrada e gere o movimento de novo.'],
+];
+export function dicaSigen(msg: string): string {
+  const m = semAcento(msg).toLowerCase();
+  return DICAS.find(([re]) => re.test(m))?.[1] || '';
+}
+
 /** Linha do movimento como o app mostra (gerado ou gravado) */
 function mapear(r: any) {
   return {
@@ -143,6 +171,7 @@ function mapear(r: any) {
     statusEnvio: s(r.status_envio),
     statusCanc: s(r.status_canc),
     mensagem: s(r.mensagem),
+    dica: s(r.status_envio) === 'E' || s(r.status_canc) === 'E' ? dicaSigen(s(r.mensagem)) : '',
   };
 }
 
@@ -302,7 +331,10 @@ export function createMovimentoRouter() {
       if (cancelar && sucesso && s(r.tipo_operacao) === 'CO') comandos.push(statusCompra(r, ''));
       await executarScript(comandos);
       if (sucesso) ok++;
-      else falhas.push(`${s(r.descricao_produto)} (${dataBR(r.data_emissao)}): ${msg}`);
+      else {
+        const dica = dicaSigen(msg);
+        falhas.push(`${s(r.descricao_produto)} (${dataBR(r.data_emissao)}): ${msg}${dica ? ` Como resolver: ${dica}` : ''}`);
+      }
     }
     res.json({ ok, falhas });
   }));

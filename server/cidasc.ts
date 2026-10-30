@@ -51,7 +51,10 @@ export async function loginSigen(url: string, usuario: string, senha: string): P
   });
   const sessao = s(login.corpo?.SessionID);
   if (login.status !== 200 || !sessao) {
-    throw new BmapiError(mensagens(login.corpo) || `Falha no login do profissional no SIGEN (HTTP ${login.status}).`);
+    throw new BmapiError(
+      `${mensagens(login.corpo) || `Falha no login do profissional no SIGEN (HTTP ${login.status}).`} ` +
+      'Como resolver: confira o Usuário SIGEN e a Senha SIGEN do profissional em Profissionais (teste o mesmo login no site do SIGEN).',
+    );
   }
   return { sessao, cookie: login.cookie };
 }
@@ -86,17 +89,19 @@ async function montar(id: number) {
   );
 
   const erros: string[] = [];
-  if (!n(r.registro)) erros.push('Nr do registro da empresa na CIDASC inválido!');
-  if (!s(r.crea)) erros.push('Nr do CREA do profissional inválido!');
-  if (!s(r.usuario) || !s(r.senha)) erros.push('Usuário ou senha do profissional para o SIGEN inválido!');
-  if (!s(r.ibge)) erros.push('Código IBGE do município inválido!');
-  if (!n(r.cultura)) erros.push('Código da cultura (CIDASC) inválido!');
-  if (!n(r.localidade)) erros.push('Código da localidade do endereço do produtor inválido!');
-  if (!n(r.tipo)) erros.push('Código do tipo do logradouro do produtor inválido!');
+  // Cada consistência já diz como resolver
+  const erro = (msg: string, dica: string) => erros.push(`${msg} Como resolver: ${dica}`);
+  if (!n(r.registro)) erro('Nr do registro da empresa na CIDASC inválido!', 'informe o registro CIDASC no cadastro da empresa no ERP.');
+  if (!s(r.crea)) erro('Nr do CREA do profissional inválido!', 'preencha o "SIGEN CREA-SC" do profissional em Profissionais.');
+  if (!s(r.usuario) || !s(r.senha)) erro('Usuário ou senha do profissional para o SIGEN inválido!', 'preencha "Usuário SIGEN" e "Senha SIGEN" do profissional em Profissionais.');
+  if (!s(r.ibge)) erro('Código IBGE do município inválido!', 'corrija a cidade no cadastro do cliente e escolha o cliente de novo nos dados iniciais da receita.');
+  if (!n(r.cultura)) erro('Código da cultura (CIDASC) inválido!', 'na tela Culturas, preencha o "ID CIDASC" da cultura da receita (confira o código na aba Culturas das Tabelas CIDASC).');
+  if (!n(r.localidade)) erro('Código da localidade do endereço do produtor inválido!', 'escolha a Localidade nos dados iniciais da receita (se a lista estiver vazia, atualize as Tabelas CIDASC).');
+  if (!n(r.tipo)) erro('Código do tipo do logradouro do produtor inválido!', 'escolha o Tipo de logradouro nos dados iniciais da receita.');
   // O SIGEN exige a georreferência (recusa zerada)
-  if (!n(r.lat) || !n(r.lon)) erros.push('Latitude e longitude do local de aplicação não informadas!');
-  if (!n(r.alt)) erros.push('Altitude do local de aplicação não informada!');
-  if (!produtos.length) erros.push('Receita sem produtos.');
+  if (!n(r.lat) || !n(r.lon)) erro('Latitude e longitude do local de aplicação não informadas!', 'nos dados iniciais, use "Escolher no Google Maps" ou "Colar coordenadas" (ou "Usar minha localização" se estiver na propriedade).');
+  if (!n(r.alt)) erro('Altitude do local de aplicação não informada!', 'nos dados iniciais, clique em "Buscar altitude" depois de informar a latitude e a longitude.');
+  if (!produtos.length) erro('Receita sem produtos.', 'inclua ao menos um produto na etapa Produtos.');
 
   const cfg = await lerRecConfig();
   const diagnosticos = [];
@@ -104,13 +109,13 @@ async function montar(id: number) {
     const nr = `${i + 1}o.`;
     const modalidade = await lerMemo('SELECT MODO_APLICACAO FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id', { id: p.tratamento });
     const precaucao = await lerMemo('SELECT PRECAUCOES_USO FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id', { id: p.tratamento });
-    if (!n(p.def)) erros.push(`ID (CIDASC) do ${nr} agrotóxico inválido!`);
-    if (!n(p.un_qtd)) erros.push(`ID (CIDASC) da unidade adquirida do ${nr} agrotóxico inválida!`);
-    if (!n(p.un_area)) erros.push(`ID (CIDASC) da unidade da área do ${nr} agrotóxico inválida!`);
-    if (!n(p.un_dose)) erros.push(`ID (CIDASC) da unidade da dose do ${nr} agrotóxico inválida!`);
+    if (!n(p.def)) erro(`ID (CIDASC) do ${nr} agrotóxico inválido!`, 'na tela Defensivos, use "Vincular CIDASC" no defensivo e depois altere o produto na receita (Finalizar) para gravar o código.');
+    if (!n(p.un_qtd)) erro(`ID (CIDASC) da unidade adquirida do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN a adquirir (CIDASC)".');
+    if (!n(p.un_area)) erro(`ID (CIDASC) da unidade da área do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN da área" (normalmente HA).');
+    if (!n(p.un_dose)) erro(`ID (CIDASC) da unidade da dose do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN da dose (CIDASC)".');
     const epi = await lerMemo('SELECT EPI FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id', { id: p.tratamento });
-    if (!modalidade.trim()) erros.push(`Modalidade da época do ${nr} produto está em branco!`);
-    if (!epi.trim()) erros.push(`EPI do ${nr} produto está em branco!`);
+    if (!modalidade.trim()) erro(`Modalidade da época do ${nr} produto está em branco!`, 'na tela Defensivos, use "Buscar tratamentos" no defensivo (ou preencha o modo de aplicação no tratamento) e envie de novo.');
+    if (!epi.trim()) erro(`EPI do ${nr} produto está em branco!`, 'na tela Defensivos, use "Buscar tratamentos" no defensivo (ou preencha o EPI no tratamento) e envie de novo.');
     diagnosticos.push({
       cdAgrotoxico: String(n(p.def)),
       cdPraga: String(n(p.praga) ? n(p.praga_cidasc) : cfg.idPragaGenericaCidasc || 1561),
@@ -131,7 +136,7 @@ async function montar(id: number) {
     });
   }
   if (erros.length) throw new BmapiError(erros.join('\n'));
-  if (!cfg.urlWs) throw new BmapiError('URL do SIGEN da CIDASC não configurada (rec_config.url_ws).');
+  if (!cfg.urlWs) throw new BmapiError('URL do SIGEN da CIDASC não configurada (rec_config.url_ws). Como resolver: informe o endereço do SIGEN em Configurações.');
 
   return {
     r,
@@ -179,34 +184,44 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
   });
 
   if (cancelar) {
-    if (envio.status !== 200) throw new BmapiError(mensagens(envio.corpo) || `SIGEN recusou o cancelamento (HTTP ${envio.status}).`);
+    if (envio.status !== 200) {
+      throw new BmapiError(
+        `${mensagens(envio.corpo) || `SIGEN recusou o cancelamento (HTTP ${envio.status}).`} ` +
+        'Como resolver: consulte a receita no site do SIGEN para ver se ela ainda pode ser cancelada; se não puder, fale com a CIDASC.',
+      );
+    }
     await executar("UPDATE REC_RECEITAS SET CANCELADO_CIDASC = 'S' WHERE ID = :id", { id });
     return mensagens(envio.corpo) || 'Receita cancelada na CIDASC.';
   }
 
   if (envio.status !== 200) {
     const msg =
-      envio.status === 404 ? 'Erro 404 - Nenhum registro encontrado!'
+      envio.status === 404 ? 'Erro 404 - Nenhum registro encontrado! Como resolver: confira o endereço do SIGEN em Configurações.'
         : mensagens(envio.corpo) || `SIGEN recusou o envio (HTTP ${envio.status}).`;
     // "Este receituário já foi informado... Código no sistema NNN": guarda o número que o SIGEN já tem
     const ja = envio.texto.match(/C[óo]digo no sistema\D*(\d+)/i);
-    if (ja) await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_CIDASC = :nr, SESSIONID = :sess WHERE ID = :id', { nr: Number(ja[1]), sess: sessao, id });
+    if (ja) {
+      await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_CIDASC = :nr, SESSIONID = :sess WHERE ID = :id', { nr: Number(ja[1]), sess: sessao, id });
+      throw new BmapiError(`${msg}
+Como resolver: nada a fazer — a receita já estava no SIGEN e o número ${ja[1]} foi gravado nela. Recarregue a lista.`);
+    }
     // O SIGEN junta essa recusa ao texto da regra do campo IBGE, que confunde: explica o que corrigir
     if (/coordenadas inv[áa]lidas/i.test(msg)) {
       throw new BmapiError(
         `A latitude/longitude da receita (${n(r.lat)}; ${n(r.lon)}) não fica no município do cliente (IBGE ${s(r.ibge)}). ` +
-        'Corrija o local da aplicação nos dados iniciais da receita. "Usar minha localização" só serve quando você está na propriedade.',
+        'Como resolver: corrija o local da aplicação nos dados iniciais da receita. "Usar minha localização" só serve quando você está na propriedade.',
       );
     }
     if (/unidade derivada incorreta/i.test(msg)) {
       throw new BmapiError(
         `${msg}
 A UN da dose de um dos produtos não combina com a formulação do agrotóxico (líquido × sólido). ` +
-        'Altere o produto na receita e troque a UN da dose: produto líquido usa L ou mL (ex.: L/ha, mL/100 L), sólido usa kg ou g ' +
+        'Como resolver: altere o produto na receita e troque a UN da dose: produto líquido usa L ou mL (ex.: L/ha, mL/100 L), sólido usa kg ou g ' +
         '(ex.: kg/ha, g/100 L); confira o valor da dose na bula. Se a unidade já está certa, confira o vínculo CIDASC do defensivo na tela Defensivos.',
       );
     }
-    throw new BmapiError(msg);
+    throw new BmapiError(`${msg}
+Como resolver: corrija na receita o dado indicado pelo SIGEN e envie de novo; se a mensagem não ficar clara, consulte a mesma receita no site do SIGEN.`);
   }
 
   const idReceituario = n(envio.corpo?.Data?.IdReceituario);
