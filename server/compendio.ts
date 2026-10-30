@@ -294,6 +294,27 @@ export function createCompendioRouter() {
   // ---- Ações da API e manutenção ----
   r.post('/defensivos/atualizar', rotaProgresso((progresso) => atualizarCatalogo(progresso)));
 
+  /** Tabela da CIDASC inteira para conferência, lida em páginas pelo código (a bmAPI corta resultados grandes) */
+  r.get('/cidasc/tabela/:tipo(agrotoxicos|culturas|pragas)', rota(async (req, res) => {
+    const sql = {
+      agrotoxicos: 'SELECT IDAGROTOXICO id, NRREGISTROMAPA mapa, NMMARCACOMERCIAL nome, CSSITUACAO situacao FROM REC_DEFENSIVOS_CIDASC WHERE IDAGROTOXICO',
+      culturas: 'SELECT IDNOMECOMUMESPECIEVEGETAL id, NMCOMUMESPECIEVEGERAL nome FROM REC_CULTURAS_CIDASC WHERE IDNOMECOMUMESPECIEVEGETAL',
+      pragas: 'SELECT IDPRAGA id, NMCIENTIFICOPRAGA nome FROM REC_PRAGAS_CIDASC WHERE IDPRAGA',
+    }[req.params.tipo as 'agrotoxicos' | 'culturas' | 'pragas'];
+    const linhas: any[] = [];
+    for (let ultimo = -1; ;) {
+      const pagina = await consultarComLimite(`${sql} > ${ultimo} ORDER BY id TOP 500`);
+      if (pagina.truncated) throw new BmapiError('A bmAPI cortou a leitura da tabela da CIDASC.');
+      linhas.push(...pagina.rows);
+      if (pagina.rows.length < 500) break;
+      ultimo = Number(pagina.rows[pagina.rows.length - 1].id);
+    }
+    res.json(linhas.map((c) => ({
+      id: Number(c.id), nome: String(c.nome || '').trim(),
+      ...(c.mapa !== undefined ? { registroMapa: String(c.mapa || '').trim(), situacao: String(c.situacao || '').trim() } : {}),
+    })));
+  }));
+
   /** Agrotóxicos, culturas e pragas da CIDASC (SIGEN de rec_config.url_ws) */
   r.post('/cidasc/atualizar-tabelas', rotaProgresso((progresso) => atualizarTabelasCidasc(progresso)));
 

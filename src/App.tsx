@@ -19,6 +19,7 @@ import {
 } from './components/CadastrosViews';
 import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { MovimentoView } from './components/MovimentoView';
+import { TabelasCidascView } from './components/TabelasCidascView';
 import { MeusDadosModal } from './components/MeusDadosModal';
 import { Toast } from './components/Toast';
 
@@ -108,6 +109,7 @@ export const App: React.FC = () => {
     clientes: 'Clientes',
     configuracoes: 'Configurações',
     movimento: 'Movimento de agrotóxicos (CIDASC)',
+    tabelasCidasc: 'Tabelas da CIDASC (SIGEN)',
   };
 
   const titulo = titulosPorAba[activeTab] || titulosPorAba.dashboard;
@@ -180,6 +182,7 @@ export const App: React.FC = () => {
             {activeTab === 'clientes' && <ClientesView />}
             {activeTab === 'configuracoes' && <ConfiguracoesView />}
             {activeTab === 'movimento' && <MovimentoView />}
+            {activeTab === 'tabelasCidasc' && <TabelasCidascView />}
           </main>
         )}
       </div>

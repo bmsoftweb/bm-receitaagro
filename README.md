@@ -55,6 +55,11 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.11
+- Nova opção Tabelas CIDASC no menu Compêndio: atualiza agrotóxicos, culturas e pragas pelo SIGEN
+  (com barra de progresso) e mostra cada tabela numa aba para conferência, com pesquisa.
+- O botão Tabelas CIDASC saiu da tela de Defensivos.
+
 ### 0.0.10
 - Atualizar da API grava o código CIDASC que vem da API em produtos, culturas e pragas; MAPA e nome
   ficam só para quem vem sem código, e o vínculo manual continua valendo.
