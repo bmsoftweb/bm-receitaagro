@@ -54,6 +54,9 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.13
+- Coluna indicadora (">") nas grades das Tabelas CIDASC, como nas outras listas.
+
 ### 0.0.12
 - Tabelas CIDASC com todas as tabelas que vêm do SIGEN (TfrmAtualizar): agrotóxicos, culturas,
   pragas, localidades, tipos de logradouro, unidades de medida, unidades derivadas e embalagens.

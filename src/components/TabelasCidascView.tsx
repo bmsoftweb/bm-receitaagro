@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CloudDownload, FlaskConical, Sprout, Bug, MapPin, Signpost, Ruler, Divide, Package, Search, RefreshCw, Inbox } from 'lucide-react';
+import { CloudDownload, FlaskConical, Sprout, Bug, MapPin, Signpost, Ruler, Divide, Package, Search, RefreshCw, Inbox, ChevronRight } from 'lucide-react';
 import { get } from '../services/api';
 import { formatDecimal } from '../utils/formatters';
 import { INPUT_CLASS, FIELD_WRAPPER_CLASS } from '../utils/formStyles';
-import { PAINEL, BARRA, BARRA_INFO, BTN_PRIMARIO, BTN_SECUNDARIO, GRADE_AREA, TABELA, TH, TR, TD, TD_VAZIO } from '../utils/listaStyles';
+import { PAINEL, BARRA, BARRA_INFO, BTN_PRIMARIO, BTN_SECUNDARIO, GRADE_AREA, TABELA, TH, TH_INDICADOR, TR, TD, TD_INDICADOR, INDICADOR, TD_VAZIO } from '../utils/listaStyles';
 import { abaClasse, abaTexto } from './BarraAbas';
 import { AvisoErro } from './AvisoErro';
 import { ConfirmModal } from './ConfirmModal';
@@ -111,16 +111,17 @@ export const TabelasCidascView: React.FC = () => {
         <div key={tipo} className={GRADE_AREA}>
           <table className={TABELA}>
             <thead className="sticky top-0 z-10">
-              <tr>{aba.colunas.map((c) => <th key={c.campo} className={`${TH} ${c.classe ? '' : 'text-left'}`}>{c.titulo}</th>)}</tr>
+              <tr><th className={TH_INDICADOR} />{aba.colunas.map((c) => <th key={c.campo} className={`${TH} ${c.classe ? '' : 'text-left'}`}>{c.titulo}</th>)}</tr>
             </thead>
             <tbody>
               {paginacao.visiveis.map((l) => (
                 <tr key={String(l.id)} className={TR}>
+                  <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
                   {aba.colunas.map((c) => <td key={c.campo} className={`${TD} ${c.classe || ''}`}>{c.formato ? c.formato(l[c.campo]) : l[c.campo]}</td>)}
                 </tr>
               ))}
               {!carregando && !filtradas.length && (
-                <tr><td colSpan={aba.colunas.length} className={TD_VAZIO}><Inbox className="w-6 h-6 mx-auto mb-2" />Nenhum registro.</td></tr>
+                <tr><td colSpan={aba.colunas.length + 1} className={TD_VAZIO}><Inbox className="w-6 h-6 mx-auto mb-2" />Nenhum registro.</td></tr>
               )}
             </tbody>
           </table>
