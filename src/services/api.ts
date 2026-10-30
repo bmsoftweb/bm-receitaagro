@@ -46,6 +46,30 @@ export async function send<T = any>(method: string, url: string, body?: unknown)
   );
 }
 
+/** Andamento de uma ação longa (rotaProgresso no servidor) */
+export interface Andamento { etapa: string; feitos: number; total: number }
+
+/** POST numa rota com progresso: chama aoAvancar a cada etapa e devolve o resultado final */
+export async function sendProgresso<T = any>(url: string, aoAvancar: (a: Andamento) => void): Promise<T> {
+  const res = await fetch(url, { method: 'POST', headers: headers() });
+  if (!res.ok || !res.body) return parseOrThrow(res);
+  const leitor = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let resto = '';
+  for (;;) {
+    const { value, done } = await leitor.read();
+    resto += value ?? '';
+    const linhas = resto.split('\n');
+    resto = done ? '' : linhas.pop() ?? '';
+    for (const l of linhas.filter(Boolean)) {
+      const o = JSON.parse(l);
+      if (o.erro) throw new Error(o.erro);
+      if ('ok' in o) return o.ok as T;
+      aoAvancar(o as Andamento);
+    }
+    if (done) throw new Error('A conexão terminou antes do fim da atualização.');
+  }
+}
+
 // ------------------------------------------------------------
 // Autenticação
 // ------------------------------------------------------------

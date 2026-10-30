@@ -48,12 +48,23 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 - Assinatura digital com PFX (Chilkat), envio do PDF por FTP e QR code: a impressão é pelo
   navegador e mostra a chave do PDF em texto.
-- Impressão matricial, sincronização SIGEN/CIDASC (TfrmAtualizar), Zerar Estoque e Gerar
+- Impressão matricial, localidades e unidades do SIGEN (TfrmAtualizar), Zerar Estoque e Gerar
   Padrões.
 - Telas do compêndio antigo (ufrmDefensivos, ufrmCompendio, PesqDef, PesqPraga) e as tabelas
   ainda protegidas por senha (`REC_CULTURAS_PRAGAS_PRODUTOS`, `REC_UFS_RESTRICOES` e afins).
 
 ## Histórico
+
+### 0.0.10
+- Atualizar da API grava o código CIDASC que vem da API em produtos, culturas e pragas; MAPA e nome
+  ficam só para quem vem sem código, e o vínculo manual continua valendo.
+- Atualizar da API só com o que mudou desde a última vez (`dhalt__gte`), quando existir a coluna
+  `REC_CONFIG.DATA_CATALOGO_NOVOREC`; sem ela (ou sem data) baixa tudo.
+- Corrigido o erro "Error creating table handle" na ligação dos defensivos pelo registro MAPA.
+- Buscar tratamentos e o passo de pragas do assistente pelo `relacoes/simple`: segundos em vez de
+  minutos (uma consulta por praga).
+- Botão "Tabelas CIDASC" nos Defensivos: baixa do SIGEN os agrotóxicos, culturas e pragas da CIDASC.
+- Modal com barra de progresso no Atualizar da API e nas Tabelas CIDASC.
 
 ### 0.0.9
 - Versão do sistema no rodapé da tela de login.

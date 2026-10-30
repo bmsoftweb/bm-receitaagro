@@ -106,3 +106,9 @@ html, body {
   .area-impressao, .area-impressao * { visibility: visible; }
   .area-impressao { position: absolute; left: 0; top: 0; width: 100%; }
 }
+
+/* Barra de progresso sem total (ProgressoModal) */
+@keyframes progresso {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

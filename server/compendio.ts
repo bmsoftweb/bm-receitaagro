@@ -3,8 +3,9 @@ import {
   consultar, consultarUm, consultarComLimite, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlNumero, sqlInteiro,
   sqlListaInteiros, tabelaMemoria,
 } from './bmapi.js';
-import { rota, texto, maiusculo, idParam, busca, semAcento } from './util.js';
+import { rota, rotaProgresso, texto, maiusculo, idParam, busca, semAcento } from './util.js';
 import { atualizarCatalogo, acertarTabelas, buscarTratamentosDoProduto } from './novorec.js';
+import { atualizarTabelasCidasc } from './cidasc.js';
 
 /**
  * Compêndio (ufrmDefensivosNovo, ufrmCulturasNovo, ufrmPragasNovo, ufrmProBM, ufrmProCIDASC):
@@ -291,9 +292,10 @@ export function createCompendioRouter() {
   }));
 
   // ---- Ações da API e manutenção ----
-  r.post('/defensivos/atualizar', rota(async (_req, res) => {
-    res.json(await atualizarCatalogo());
-  }));
+  r.post('/defensivos/atualizar', rotaProgresso((progresso) => atualizarCatalogo(progresso)));
+
+  /** Agrotóxicos, culturas e pragas da CIDASC (SIGEN de rec_config.url_ws) */
+  r.post('/cidasc/atualizar-tabelas', rotaProgresso((progresso) => atualizarTabelasCidasc(progresso)));
 
   /** Prévia (?simular=S) ou limpeza das linhas repetidas do REC_DEFENSIVOS */
   r.post('/defensivos/limpar-duplicados', rota(async (req, res) => {

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Package, Link2, ListChecks, CloudDownload, Eraser, Copy, RefreshCw, Wrench, Loader2, Plus, Trash2, Save, Pencil, Layers,
+  Package, Link2, ListChecks, CloudDownload, Eraser, Copy, RefreshCw, Wrench, Loader2, Plus, Trash2, Save, Pencil, Layers, Database,
 } from 'lucide-react';
-import { get, send, qs } from '../services/api';
+import { get, send, sendProgresso, qs, Andamento } from '../services/api';
 import { Cadastro } from './Cadastro';
 import { Modal } from './Modal';
 import { AvisoErro } from './AvisoErro';
@@ -46,11 +46,13 @@ const ProdutosErpModal: React.FC<{ def: Defensivo; onFechar: () => void }> = ({ 
     }
   };
   return (
-    <Modal isOpen onClose={onFechar} title="Produtos do ERP" subtitle={def.nome} size="md"
+    <Modal isOpen onClose={onFechar} title="Produtos do ERP" subtitle={def.nome} size="lg"
       footer={<>
         <button type="button" onClick={onFechar} className={BTN_SECUNDARIO}>Cancelar</button>
         <button type="button" onClick={salvar} disabled={salvando} className={BTN_PRIMARIO}>{salvando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}Salvar</button>
       </>}>
+      {/* Altura mínima: a lista da pesquisa abre dentro do modal */}
+      <div className="min-h-[26rem] flex flex-col gap-3">
       <Erro msg={erro} onFechar={() => setErro(null)} />
       <label className={LABEL_CLASS}>Adicionar produto</label>
       <Pesquisa
@@ -73,6 +75,7 @@ const ProdutosErpModal: React.FC<{ def: Defensivo; onFechar: () => void }> = ({ 
           {!lista.length && <tr><td className={`${TD} text-stone-400`}>Nenhum produto associado.</td></tr>}
         </tbody>
       </table>
+      </div>
     </Modal>
   );
 };
@@ -89,7 +92,8 @@ const CidascModal: React.FC<{ def: Defensivo; onFechar: () => void }> = ({ def, 
     }
   };
   return (
-    <Modal isOpen onClose={onFechar} title="Vincular à CIDASC" subtitle={`${def.nome} • MAPA ${def.registroMapa || '–'} • atual ${def.idCidasc || 'sem vínculo'}`} size="md">
+    <Modal isOpen onClose={onFechar} title="Vincular à CIDASC" subtitle={`${def.nome} • MAPA ${def.registroMapa || '–'} • atual ${def.idCidasc || 'sem vínculo'}`} size="lg">
+      <div className="min-h-[26rem] flex flex-col gap-3">
       <Erro msg={erro} onFechar={() => setErro(null)} />
       <label className={LABEL_CLASS}>Marca comercial ou registro MAPA</label>
       <Pesquisa
@@ -100,6 +104,7 @@ const CidascModal: React.FC<{ def: Defensivo; onFechar: () => void }> = ({ def, 
         onEscolher={escolher}
       />
       <p className="text-[11px] text-stone-400">O vínculo manual não é sobrescrito pela atualização automática.</p>
+      </div>
     </Modal>
   );
 };
@@ -270,6 +275,27 @@ const TratamentosModal: React.FC<{ def: Defensivo; onFechar: () => void }> = ({ 
   );
 };
 
+/** Andamento de uma atualização longa; sem total, a barra fica correndo */
+const ProgressoModal: React.FC<{ titulo: string; andamento: Andamento | null }> = ({ titulo, andamento }) => {
+  const pct = andamento?.total ? Math.round((andamento.feitos / andamento.total) * 100) : null;
+  return (
+    <Modal isOpen onClose={() => {}} title={titulo} subtitle="Aguarde até terminar" size="sm">
+      <div className="flex flex-col gap-2 py-2">
+        <div className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-200">
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+          <span className="flex-1">{andamento?.etapa || 'Iniciando…'}</span>
+          {pct !== null && <span className="font-mono text-xs text-stone-500">{andamento!.feitos} de {andamento!.total}</span>}
+        </div>
+        <div className="h-2.5 rounded-full bg-stone-200 dark:bg-stone-700 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct ?? undefined}>
+          {pct !== null
+            ? <div className="h-full bg-amber-600 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+            : <div className="h-full w-1/3 bg-amber-600 rounded-full animate-[progresso_1.2s_ease-in-out_infinite]" />}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // ---------------- Tela ----------------
 export const DefensivosView: React.FC = () => {
   const [dialogo, setDialogo] = useState<{ tipo: 'bm' | 'cidasc' | 'trat'; def: Defensivo } | null>(null);
@@ -277,6 +303,8 @@ export const DefensivosView: React.FC = () => {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [duplicados, setDuplicados] = useState<{ produtos: number; linhas: number; conflitos: number } | null>(null);
+  const [tabelasCidasc, setTabelasCidasc] = useState(false);
+  const [progresso, setProgresso] = useState<{ titulo: string; andamento: Andamento | null } | null>(null);
 
   const acaoGeral = async (nome: string, url: string, msg: (r: any) => string) => {
     try {
@@ -286,6 +314,21 @@ export const DefensivosView: React.FC = () => {
     } catch (e: any) {
       setAviso(e.message);
     } finally {
+      setOcupado(null);
+    }
+  };
+  /** Ação longa com o modal de progresso */
+  const acaoProgresso = async (nome: string, titulo: string, url: string, msg: (r: any) => string) => {
+    try {
+      setOcupado(nome);
+      setProgresso({ titulo, andamento: null });
+      const r = await sendProgresso(url, (andamento) => setProgresso({ titulo, andamento }));
+      toast(msg(r));
+      setRecarga((n) => n + 1);
+    } catch (e: any) {
+      setAviso(e.message);
+    } finally {
+      setProgresso(null);
       setOcupado(null);
     }
   };
@@ -319,11 +362,14 @@ export const DefensivosView: React.FC = () => {
         carregar={async (q) => (await get<{ defensivos: Defensivo[] }>(`/api/defensivos${qs({ q })}`)).defensivos}
         descrever={(d) => d.nome}
         barra={<>
-          <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoGeral('api', '/api/defensivos/atualizar', (r) => `Catálogo atualizado: ${JSON.stringify(r)}`)} title="Baixar produtos, culturas e pragas do Novo Receituário" className={BTN_SECUNDARIO}>
+          <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoProgresso('api', 'Atualizando da API do Novo Receituário', '/api/defensivos/atualizar', (r: { defensivos: number; culturas: number; pragas: number; desde: string }) => `Catálogo atualizado${r.desde ? ` (alterações desde ${r.desde.split('-').reverse().join('/')})` : ''}: ${r.defensivos} defensivo(s), ${r.culturas} cultura(s) e ${r.pragas} praga(s).`)} title="Baixar produtos, culturas e pragas do Novo Receituário" className={BTN_SECUNDARIO}>
             {ocupado === 'api' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Atualizar da API
           </button>
           <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoGeral('acertar', '/api/defensivos/acertar-tabelas', () => 'Tabelas acertadas.')} title="Refazer os vínculos entre culturas, pragas e produtos" className={BTN_SECUNDARIO}>
             {ocupado === 'acertar' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}Acertar tabelas
+          </button>
+          <button type="button" disabled={Boolean(ocupado)} onClick={() => setTabelasCidasc(true)} title="Baixar do SIGEN as tabelas de agrotóxicos, culturas e pragas da CIDASC" className={BTN_SECUNDARIO}>
+            {ocupado === 'tabelas-cidasc' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}Tabelas CIDASC
           </button>
           <button type="button" disabled={Boolean(ocupado)} onClick={verDuplicados} title="Apagar as linhas repetidas do mesmo produto na ponte REC_DEFENSIVOS" className={BTN_SECUNDARIO}>
             {ocupado === 'duplicados' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}Limpar duplicados
@@ -351,7 +397,7 @@ export const DefensivosView: React.FC = () => {
           { icone: Link2, titulo: 'Vincular CIDASC', descricao: 'escolher o agrotóxico na tabela da CIDASC', semRecarga: true, executar: (def) => setDialogo({ tipo: 'cidasc', def }) },
           {
             icone: CloudDownload, titulo: 'Buscar tratamentos', descricao: 'baixar as dosagens na API do Novo Receituário',
-            executar: async (d) => `Tratamentos de ${d.nome} atualizados (${(await send<{ consultas: number }>('POST', `/api/defensivos/${d.id}/buscar-tratamentos`)).consultas} consulta(s)).`,
+            executar: async (d) => (toast(`Buscando os tratamentos de ${d.nome} na API…`), `Tratamentos de ${d.nome} atualizados (${(await send<{ consultas: number }>('POST', `/api/defensivos/${d.id}/buscar-tratamentos`)).consultas} tratamento(s)).`),
           },
           {
             icone: Eraser, titulo: 'Limpar consulta', descricao: 'a próxima receita consulta a API de novo',
@@ -366,6 +412,19 @@ export const DefensivosView: React.FC = () => {
       {dialogo?.tipo === 'bm' && <ProdutosErpModal def={dialogo.def} onFechar={fechar} />}
       {dialogo?.tipo === 'cidasc' && <CidascModal def={dialogo.def} onFechar={fechar} />}
       {dialogo?.tipo === 'trat' && <TratamentosModal def={dialogo.def} onFechar={fechar} />}
+      {progresso && <ProgressoModal titulo={progresso.titulo} andamento={progresso.andamento} />}
+      {tabelasCidasc && (
+        <ConfirmModal
+          titulo="Tabelas CIDASC"
+          mensagem={<>Substituir as tabelas de <strong>agrotóxicos, culturas e pragas</strong> da CIDASC pelas listas atuais do SIGEN? Os vínculos já feitos continuam.</>}
+          textoConfirmar="Atualizar tabelas"
+          onConfirmar={() => {
+            setTabelasCidasc(false);
+            acaoProgresso('tabelas-cidasc', 'Atualizando as tabelas da CIDASC', '/api/cidasc/atualizar-tabelas', (r) => `Tabelas da CIDASC (${r.ambiente}) atualizadas: ${r.agrotoxicos} agrotóxico(s), ${r.culturas} cultura(s) e ${r.pragas} praga(s).`);
+          }}
+          onCancelar={() => setTabelasCidasc(false)}
+        />
+      )}
       {duplicados && (
         <ConfirmModal
           titulo="Limpar duplicados"

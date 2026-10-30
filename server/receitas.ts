@@ -8,7 +8,7 @@ import { rota, texto, idParam, busca } from './util.js';
 import { lerRecConfig } from './cadastros.js';
 import { SQL_TRATAMENTO, mapearTratamento } from './compendio.js';
 import { transmitirCidasc } from './cidasc.js';
-import { syncCulturasDoProduto, syncProdutosDaCultura, syncPragas, syncTratamento } from './novorec.js';
+import { syncCulturasDoProduto, syncProdutosDaCultura, syncTratamentosDoProduto, syncTratamento } from './novorec.js';
 import {
   doseValida, numeroReceitaFull, chavePdf, tiposAplicacaoLiberados,
 } from '../shared/receita.js';
@@ -546,7 +546,8 @@ export function createReceitasRouter() {
     const idProduto = Number(req.query.produto) || 0;
     const idCultura = Number(req.query.cultura) || 0;
     const token = req.query.atualizar === 'S' ? await tokenOnline() : null;
-    if (token) await syncPragas(idProduto, idCultura, token);
+    // Tratamentos da cultura no produto de uma vez (relacoes/simple), já com as pragas
+    if (token) await syncTratamentosDoProduto(idProduto, token, idCultura);
     const pragas = await consultar(
       `SELECT A.ID_PRAGA id, B.NOME nome, B.NOME_CIENTIFICO cientifico, B.ID_CIDASC id_cidasc
          FROM REC_NOVOREC_PRAGAS_CULTURA_PRODUTO A
@@ -554,12 +555,6 @@ export function createReceitasRouter() {
         WHERE A.ID_PRODUTO = :p AND A.ID_CULTURA = :c ORDER BY B.NOME`,
       { p: idProduto, c: idCultura },
     );
-    if (token) {
-      for (const g of pragas) {
-        await syncTratamento(idProduto, idCultura, n(g.id), token);
-        await new Promise((ok) => setTimeout(ok, 500));
-      }
-    }
     const contagem = await consultar(
       `SELECT ID_PRAGA id, COUNT(*) q FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO
         WHERE ID_PRODUTO = :p AND ID_CULTURA = :c GROUP BY ID_PRAGA`,

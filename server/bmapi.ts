@@ -124,9 +124,10 @@ export async function executar(sql: string, params?: Record<string, any>): Promi
 }
 
 /** Vários comandos de escrita, em scripts de até 100 comandos (os valores já vêm como literais) */
-export async function executarScript(comandos: string[]): Promise<void> {
+export async function executarScript(comandos: string[], aoAvancar?: (feitos: number, total: number) => void): Promise<void> {
   for (let i = 0; i < comandos.length; i += 100) {
     await executar(comandos.slice(i, i + 100).join(';\n'));
+    aoAvancar?.(Math.min(i + 100, comandos.length), comandos.length);
   }
 }
 

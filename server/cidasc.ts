@@ -1,6 +1,6 @@
-import { consultar, consultarUm, executar, lerMemo, BmapiError } from './bmapi.js';
+import { consultar, consultarUm, executar, executarScript, lerMemo, BmapiError, sqlTexto, sqlInteiro } from './bmapi.js';
 import { lerRecConfig } from './cadastros.js';
-import { semAcento } from './util.js';
+import { semAcento, Progresso } from './util.js';
 
 /**
  * Envio do receituário ao SIGEN da CIDASC (receita_e.exe, ufrmEnviarReceita.btnEnviarReceitaClick):
@@ -205,4 +205,48 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
   if (!idReceituario) throw new BmapiError('Número do receituário retornado = 0 (verifique no SIGEN possível erro no cadastro do técnico).');
   await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_CIDASC = :nr, SESSIONID = :sess WHERE ID = :id', { nr: idReceituario, sess: sessao, id });
   return `Receita enviada à CIDASC: nº ${idReceituario}.`;
+}
+
+/**
+ * Tabelas da CIDASC (ufrmAtualizar): agrotóxicos, culturas e pragas pelos Pesquisar do SIGEN, que não pedem login.
+ * Baixa as três antes de mexer na base e só então esvazia e grava cada uma, como o Delphi.
+ * O MAPA fica só com dígitos e sem zeros à esquerda (IntToStr(StrToInt(SoNumeros))), como o Delphi grava.
+ */
+export async function atualizarTabelasCidasc(progresso: Progresso = () => {}): Promise<{ ambiente: string; agrotoxicos: number; culturas: number; pragas: number }> {
+  const cfg = await lerRecConfig();
+  if (!cfg.urlWs) throw new BmapiError('URL do SIGEN da CIDASC não configurada (rec_config.url_ws).');
+  const url = cfg.urlWs.replace(/\/+$/, '');
+  const lista = async (recurso: string, chave: string) => {
+    const r = await chamar(`${url}/${recurso}`, { method: 'GET' });
+    const itens = r.corpo?.[chave];
+    if (r.status !== 200 || !Array.isArray(itens) || !itens.length) {
+      throw new BmapiError(mensagens(r.corpo) || `O SIGEN não devolveu a lista de ${chave} (HTTP ${r.status}).`);
+    }
+    return itens as any[];
+  };
+  progresso('Baixando os agrotóxicos do SIGEN');
+  const agrotoxicos = await lista('Agrotoxico/Pesquisar?nrRegistroMapa=', 'agrotoxicos');
+  progresso('Baixando as culturas do SIGEN');
+  const culturas = await lista('Cultura/Pesquisar', 'culturas');
+  progresso('Baixando as pragas do SIGEN');
+  const pragas = await lista('Praga/Pesquisar', 'pragas');
+
+  const maiusculo = (v: unknown, tam: number) => sqlTexto(semAcento(v).toUpperCase(), tam);
+  await executar('DELETE FROM REC_DEFENSIVOS_CIDASC');
+  await executarScript([
+    ...agrotoxicos.map((a) => `INSERT INTO REC_DEFENSIVOS_CIDASC (IDAGROTOXICO, NRREGISTROMAPA, NMMARCACOMERCIAL, CSSITUACAO)
+      VALUES (${sqlInteiro(n(a.idAgrotoxico))}, ${sqlTexto(s(a.nrRegistroMapa).replace(/\D/g, '').replace(/^0+(?=\d)/, '') || '0', 15)},
+              ${maiusculo(a.nmMarcaComercial, 50)}, ${maiusculo(a.csSituacao, 10)})`),
+  ], (f, t) => progresso('Gravando os agrotóxicos', f, t));
+  await executar('DELETE FROM REC_CULTURAS_CIDASC');
+  await executarScript([
+    ...culturas.map((c) => `INSERT INTO REC_CULTURAS_CIDASC (IDNOMECOMUMESPECIEVEGETAL, NMCOMUMESPECIEVEGERAL)
+      VALUES (${sqlInteiro(n(c.idNomeComumEspecieVegetal))}, ${maiusculo(c.nmComumEspecieVegetal, 50)})`),
+  ], (f, t) => progresso('Gravando as culturas', f, t));
+  await executar('DELETE FROM REC_PRAGAS_CIDASC');
+  await executarScript([
+    ...pragas.map((g) => `INSERT INTO REC_PRAGAS_CIDASC (IDPRAGA, NMCIENTIFICOPRAGA)
+      VALUES (${sqlInteiro(n(g.idPraga))}, ${sqlTexto(semAcento(g.nmCientificoPraga), 80)})`),
+  ], (f, t) => progresso('Gravando as pragas', f, t));
+  return { ambiente: /homologacao/i.test(url) ? 'homologação' : 'produção', agrotoxicos: agrotoxicos.length, culturas: culturas.length, pragas: pragas.length };
 }

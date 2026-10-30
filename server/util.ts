@@ -1,5 +1,27 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 
+/** Etapa de uma ação longa: texto e quanto já foi feito (total 0 = sem contagem) */
+export type Progresso = (etapa: string, feitos?: number, total?: number) => void;
+
+/**
+ * Rota longa que conta o andamento: responde em linhas JSON (NDJSON) {etapa, feitos, total}
+ * enquanto trabalha e termina com {ok: resultado} ou {erro: mensagem}.
+ */
+export function rotaProgresso(fn: (progresso: Progresso, req: Request) => Promise<unknown>): RequestHandler {
+  return (req: Request, res: Response) => {
+    res.status(200).set({ 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+    res.flushHeaders();
+    const linha = (o: unknown) => res.write(`${JSON.stringify(o)}\n`);
+    fn((etapa, feitos = 0, total = 0) => linha({ etapa, feitos, total }), req)
+      .then((r) => linha({ ok: r ?? true }))
+      .catch((err: any) => {
+        console.error(`[erro] ${req.method} ${req.originalUrl}: ${err?.message}`);
+        linha({ erro: err?.message || 'Erro inesperado.' });
+      })
+      .finally(() => res.end());
+  };
+}
+
 /** Envolve a rota: qualquer erro vira { error } com o status do BmapiError (ou 500) */
 export function rota(fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler {
   return (req: Request, res: Response, _next: NextFunction) => {
