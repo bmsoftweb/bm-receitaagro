@@ -6,6 +6,7 @@ import { createAuthRouter, exigirSessao } from './auth.js';
 import { createCadastrosRouter } from './cadastros.js';
 import { createCompendioRouter } from './compendio.js';
 import { createReceitasRouter } from './receitas.js';
+import { createMovimentoRouter } from './movimento.js';
 
 /**
  * Monta o app Express com todas as rotas /api, sem listen e sem Vite:
@@ -39,6 +40,7 @@ export function createApp() {
   app.use('/api', createCadastrosRouter());
   app.use('/api', createCompendioRouter());
   app.use('/api', createReceitasRouter());
+  app.use('/api', createMovimentoRouter());
 
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'Rota não encontrada.' });

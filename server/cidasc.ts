@@ -23,12 +23,12 @@ const virgula = (v: number, casas?: number) => (casas === undefined ? String(v) 
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
 /** Mensagens de erro: { Msg: [] } (400/401) ou { Data: { Msg: [] } } */
-function mensagens(corpo: any): string {
+export function mensagens(corpo: any): string {
   const lista = corpo?.Msg ?? corpo?.Data?.Msg;
   return Array.isArray(lista) ? lista.map(String).join('\n') : '';
 }
 
-async function chamar(url: string, init: RequestInit): Promise<{ status: number; corpo: any; texto: string; cookie: string }> {
+export async function chamar(url: string, init: RequestInit): Promise<{ status: number; corpo: any; texto: string; cookie: string }> {
   let resp: Response;
   try {
     resp = await fetch(url, { ...init, signal: AbortSignal.timeout(60_000), headers: { 'Cache-Control': 'no-store, no-cache', Accept: 'application/json', ...init.headers } });
@@ -40,6 +40,20 @@ async function chamar(url: string, init: RequestInit): Promise<{ status: number;
   try { corpo = JSON.parse(texto); } catch { /* HTML de erro do IIS */ }
   const cookie = (resp.headers.getSetCookie?.() || []).map((c) => c.split(';')[0]).join('; ');
   return { status: resp.status, corpo, texto, cookie };
+}
+
+/** Acesso/Login com authToken = base64("usuário:senha"); devolve a sessão e o cookie para as chamadas seguintes */
+export async function loginSigen(url: string, usuario: string, senha: string): Promise<{ sessao: string; cookie: string }> {
+  const login = await chamar(`${url}/Acesso/Login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ authToken: Buffer.from(`${usuario}:${senha}`).toString('base64') }),
+  });
+  const sessao = s(login.corpo?.SessionID);
+  if (login.status !== 200 || !sessao) {
+    throw new BmapiError(mensagens(login.corpo) || `Falha no login do profissional no SIGEN (HTTP ${login.status}).`);
+  }
+  return { sessao, cookie: login.cookie };
 }
 
 /** Consistências do Delphi antes de transmitir; devolve os dados já prontos para o JSON */
@@ -156,19 +170,11 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
     throw new BmapiError('Receita já enviada para a CIDASC.');
   }
 
-  const login = await chamar(`${url}/Acesso/Login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ authToken: Buffer.from(`${s(r.usuario)}:${s(r.senha)}`).toString('base64') }),
-  });
-  const sessao = s(login.corpo?.SessionID);
-  if (login.status !== 200 || !sessao) {
-    throw new BmapiError(mensagens(login.corpo) || `Falha no login do profissional no SIGEN (HTTP ${login.status}).`);
-  }
+  const { sessao, cookie } = await loginSigen(url, s(r.usuario), s(r.senha));
 
   const envio = await chamar(`${url}/Receituario/${cancelar ? 'Cancelar' : 'Incluir'}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(login.cookie ? { Cookie: login.cookie } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
     body: JSON.stringify(corpo),
   });
 

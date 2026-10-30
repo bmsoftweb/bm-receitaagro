@@ -14,6 +14,7 @@ import {
   X,
   User,
   Settings,
+  ArrowLeftRight,
   type LucideIcon,
 } from 'lucide-react';
 import { Usuario } from '../types';
@@ -29,15 +30,22 @@ export type NavTab =
   | 'observacoes'
   | 'diagnosticos'
   | 'clientes'
-  | 'configuracoes';
+  | 'configuracoes'
+  | 'movimento';
 
 export const NAV_TABS: NavTab[] = [
-  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes', 'configuracoes',
+  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes', 'configuracoes', 'movimento',
 ];
 
 export const GRUPOS: { titulo: string; itens: { id: NavTab; label: string; icon: LucideIcon }[] }[] = [
   { titulo: 'Visão Geral', itens: [{ id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard }] },
-  { titulo: 'Receituário', itens: [{ id: 'receitas', label: 'Receitas', icon: FileText }] },
+  {
+    titulo: 'Receituário',
+    itens: [
+      { id: 'receitas', label: 'Receitas', icon: FileText },
+      { id: 'movimento', label: 'Movimento CIDASC', icon: ArrowLeftRight },
+    ],
+  },
   {
     titulo: 'Compêndio',
     itens: [

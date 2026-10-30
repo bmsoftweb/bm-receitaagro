@@ -18,6 +18,7 @@ import {
   ProfissionaisView, ArtsView, ObservacoesView, DiagnosticosView, ClientesView, CulturasView, PragasView,
 } from './components/CadastrosViews';
 import { ConfiguracoesView } from './components/ConfiguracoesView';
+import { MovimentoView } from './components/MovimentoView';
 import { MeusDadosModal } from './components/MeusDadosModal';
 import { Toast } from './components/Toast';
 
@@ -106,6 +107,7 @@ export const App: React.FC = () => {
     diagnosticos: 'Diagnósticos',
     clientes: 'Clientes',
     configuracoes: 'Configurações',
+    movimento: 'Movimento de agrotóxicos (CIDASC)',
   };
 
   const titulo = titulosPorAba[activeTab] || titulosPorAba.dashboard;
@@ -177,6 +179,7 @@ export const App: React.FC = () => {
             {activeTab === 'diagnosticos' && <DiagnosticosView />}
             {activeTab === 'clientes' && <ClientesView />}
             {activeTab === 'configuracoes' && <ConfiguracoesView />}
+            {activeTab === 'movimento' && <MovimentoView />}
           </main>
         )}
       </div>

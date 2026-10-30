@@ -55,6 +55,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.8
+- Nova tela Movimento CIDASC (envio do movimento de agrotóxicos ao SIGEN, como no receita_e.exe):
+  gerar e gravar o movimento do período, enviar ou cancelar itens e excluir os não enviados.
+
 ### 0.0.7
 - Impressão marca a receita como impressa também quando sai pelo Ctrl+P; se a marcação falhar,
   aparece aviso.
