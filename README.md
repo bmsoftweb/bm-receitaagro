@@ -54,6 +54,11 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.20
+- Envio à CIDASC: quando o SIGEN responde que o número da receita já foi informado (usado por outra
+  receita do mesmo profissional, em outra base), a receita pula para o próximo número e é reenviada
+  sozinha. Antes gravava nela o código CIDASC da outra receita.
+
 ### 0.0.19
 - Assistente do produto mais rápido: escolher o defensivo só regrava os tratamentos quando a bula, os
   tratamentos ou o de-para do compêndio mudaram desde a última sincronização (de ~15 s para ~0,1 s).

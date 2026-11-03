@@ -7,7 +7,7 @@ import {
 import { rota, texto, idParam, busca } from './util.js';
 import { lerRecConfig } from './cadastros.js';
 import { SQL_TRATAMENTO, mapearTratamento } from './compendio.js';
-import { transmitirCidasc, bloqueioCidasc } from './cidasc.js';
+import { transmitirCidasc, bloqueioCidasc, NumeroUsadoSigen } from './cidasc.js';
 import { syncCulturasDoProduto, syncProdutosDaCultura, syncTratamentosDoProduto, syncTratamento } from './novorec.js';
 import { usaCompendioProprio, sincronizarProduto, compendioMudou, sincronizarCultura, SO_TRATAMENTOS_PROPRIOS, ID_TRATAMENTO_PROPRIO, naoConferidos } from './compendioProprio.js';
 import {
@@ -156,22 +156,41 @@ const marcarAlterada = (id: number) => executar('UPDATE REC_RECEITAS SET STATUS_
  * ponytail: sem o LockTable do Delphi, duas receitas gravadas no mesmo instante na mesma ART
  * podem disputar o contador; se virar problema, serializar por ART no servidor.
  */
+/** Próximo número do profissional no ano (NUMERO_RECEITA_FULL, o que vai para o SIGEN) */
+async function proximoNumeroFull(idProf: unknown): Promise<string> {
+  const ano = Number(hojeISO().slice(0, 4));
+  await executar(`UPDATE REC_PROFISSIONAIS SET ULTIMA_RECEITA = IF(ANO_ATUAL = ${ano}, IF(ULTIMA_RECEITA = NULL, 0, ULTIMA_RECEITA), 0) + 1,
+                         ANO_ATUAL = ${ano} WHERE ID = ${sqlInteiro(idProf)}`);
+  const prof = await consultarUm('SELECT ULTIMA_RECEITA u, CIDASC_CODIGO c FROM REC_PROFISSIONAIS WHERE ID = :id', { id: idProf });
+  return numeroReceitaFull(ano, s(prof?.c), n(prof?.u));
+}
+
 async function gerarNumero(id: number) {
   const r = await carregarReceita(id);
   if (n(r.numero_receita) > 0) return;
-  const ano = Number(hojeISO().slice(0, 4));
-  await executarScript([
-    `UPDATE REC_ARTS SET ULTIMA_RECEITA = IF(ULTIMA_RECEITA = NULL, 0, ULTIMA_RECEITA) + 1 WHERE ID = ${sqlInteiro(r.id_art)}`,
-    `UPDATE REC_PROFISSIONAIS SET ULTIMA_RECEITA = IF(ANO_ATUAL = ${ano}, IF(ULTIMA_RECEITA = NULL, 0, ULTIMA_RECEITA), 0) + 1,
-            ANO_ATUAL = ${ano} WHERE ID = ${sqlInteiro(r.id_prof)}`,
-  ]);
+  await executar(`UPDATE REC_ARTS SET ULTIMA_RECEITA = IF(ULTIMA_RECEITA = NULL, 0, ULTIMA_RECEITA) + 1 WHERE ID = ${sqlInteiro(r.id_art)}`);
   const art = await consultarUm('SELECT ULTIMA_RECEITA u FROM REC_ARTS WHERE ID = :id', { id: r.id_art });
-  const prof = await consultarUm('SELECT ULTIMA_RECEITA u, CIDASC_CODIGO c FROM REC_PROFISSIONAIS WHERE ID = :id', { id: r.id_prof });
   await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA = :nr, NUMERO_RECEITA_FULL = :full WHERE ID = :id', {
     nr: n(art?.u),
-    full: numeroReceitaFull(ano, s(prof?.c), n(prof?.u)),
+    full: await proximoNumeroFull(r.id_prof),
     id,
   });
+}
+
+/**
+ * Envia ao SIGEN. Se o número já foi usado por outra receita do profissional (outra base com o mesmo
+ * profissional), pula para o próximo número e envia de novo.
+ */
+async function enviarCidasc(id: number): Promise<string> {
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      return await transmitirCidasc(id);
+    } catch (e) {
+      if (!(e instanceof NumeroUsadoSigen) || tentativa >= 20) throw e;
+      const r = await carregarReceita(id);
+      await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_FULL = :full WHERE ID = :id', { full: await proximoNumeroFull(r.id_prof), id });
+    }
+  }
 }
 
 export function createReceitasRouter() {
@@ -479,7 +498,7 @@ export function createReceitasRouter() {
     const rec = await carregarReceita(id);
     if (s(rec.cancelado) === 'S') throw new BmapiError('Receita cancelada não pode ser enviada.');
     await gerarNumero(id);
-    res.json({ mensagem: await transmitirCidasc(id) });
+    res.json({ mensagem: await enviarCidasc(id) });
   }));
 
   r.post('/receitas/:id/cidasc/cancelar', rota(async (req, res) => {
@@ -717,7 +736,7 @@ export function createReceitasRouter() {
     if (produtos.length > 10) throw new BmapiError('O sistema aceita (no máximo) 10 produtos por receita.');
     await gerarNumero(id);
     // Como o receita_e.exe: sem o número da CIDASC, transmite antes de imprimir
-    if (config.exigeCidascParaImprimir && !n(rec.numero_receita_cidasc)) await transmitirCidasc(id);
+    if (config.exigeCidascParaImprimir && !n(rec.numero_receita_cidasc)) await enviarCidasc(id);
     const atual = await carregarReceita(id);
 
     const itens = [];

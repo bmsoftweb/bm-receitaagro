@@ -179,6 +179,9 @@ async function montar(id: number, cancelar: boolean) {
   };
 }
 
+/** O SIGEN já tem um receituário com o número desta receita */
+export class NumeroUsadoSigen extends BmapiError {}
+
 /** Transmite (ou cancela) a receita no SIGEN; devolve a mensagem para o usuário */
 export async function transmitirCidasc(id: number, cancelar = false): Promise<string> {
   const { r, url, corpo } = await montar(id, cancelar);
@@ -213,12 +216,11 @@ export async function transmitirCidasc(id: number, cancelar = false): Promise<st
     const msg =
       envio.status === 404 ? 'Erro 404 - Nenhum registro encontrado! Como resolver: confira o endereço do SIGEN em Configurações.'
         : mensagens(envio.corpo) || `SIGEN recusou o envio (HTTP ${envio.status}).`;
-    // "Este receituário já foi informado... Código no sistema NNN": guarda o número que o SIGEN já tem
-    const ja = envio.texto.match(/C[óo]digo no sistema\D*(\d+)/i);
-    if (ja) {
-      await executar('UPDATE REC_RECEITAS SET NUMERO_RECEITA_CIDASC = :nr, SESSIONID = :sess WHERE ID = :id', { nr: Number(ja[1]), sess: sessao, id });
-      throw new BmapiError(`${msg}
-Como resolver: nada a fazer — a receita já estava no SIGEN e o número ${ja[1]} foi gravado nela. Recarregue a lista.`);
+    // "Este receituário já foi informado... Código no sistema NNN": o número do profissional já foi usado
+    // por outra receita (outra base do mesmo profissional); quem chama renumera e envia de novo
+    if (/C[óo]digo no sistema\D*\d+/i.test(envio.texto)) {
+      throw new NumeroUsadoSigen(`${msg}
+Como resolver: o número já foi usado no SIGEN por outra receita do profissional, assim como os seguintes. Envie de novo: o app tenta os próximos números.`);
     }
     // O SIGEN junta essa recusa ao texto da regra do campo IBGE, que confunde: explica o que corrigir
     if (/coordenadas inv[áa]lidas/i.test(msg)) {
