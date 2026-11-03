@@ -54,6 +54,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.21
+- Lista de receitas: a seta no começo da linha abre os produtos da receita (defensivo, praga, dose,
+  calda, aplicações, área, quantidade e carência) para conferir sem abrir a receita.
+
 ### 0.0.20
 - Envio à CIDASC: quando o SIGEN responde que o número da receita já foi informado (usado por outra
   receita do mesmo profissional, em outra base), a receita pula para o próximo número e é reenviada

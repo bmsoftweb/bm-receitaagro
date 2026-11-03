@@ -1087,6 +1087,17 @@ export const ReceitasView: React.FC = () => {
 
   const paginacao = usePaginacao(lista, JSON.stringify(filtro));
 
+  // Detalhamento na lista: produtos da receita, buscados só ao abrir
+  const [detalhes, setDetalhes] = useState<Record<number, ProdutoReceita[] | 'carregando'>>({});
+  useEffect(() => setDetalhes({}), [lista]);
+  const alternarDetalhe = (id: number) => {
+    if (detalhes[id]) return setDetalhes(({ [id]: _, ...resto }) => resto);
+    setDetalhes((d) => ({ ...d, [id]: 'carregando' }));
+    get<Receita>(`/api/receitas/${id}`)
+      .then((rec) => setDetalhes((d) => (d[id] ? { ...d, [id]: rec.produtos || [] } : d)))
+      .catch((e) => { setErro(e.message); setDetalhes(({ [id]: _, ...resto }) => resto); });
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <BarraAbas rotulo="Receitas" total={lista.length} abas={abas.map((a) => ({ uid: a.uid, titulo: a.titulo, novo: !a.id }))}
@@ -1133,8 +1144,13 @@ export const ReceitasView: React.FC = () => {
                   : <div className="flex flex-col items-center gap-2"><Inbox className="w-8 h-8" /><span className="text-sm font-medium">Nenhuma receita no período</span></div>}
               </td></tr>
             ) : paginacao.visiveis.map((r) => (
-              <tr key={r.id} className={TR} onDoubleClick={() => abrir(r.id)}>
-                <td className={TD_INDICADOR}><ChevronRight className={INDICADOR} /></td>
+              <React.Fragment key={r.id}>
+              <tr className={TR} onDoubleClick={() => abrir(r.id)}>
+                <td className={TD_INDICADOR}>
+                  <button type="button" onClick={() => alternarDetalhe(r.id)} title={detalhes[r.id] ? 'Esconder os produtos' : 'Ver os produtos da receita'} className="p-1">
+                    <ChevronRight className={detalhes[r.id] ? 'w-3.5 h-3.5 mx-auto rotate-90 text-stone-500' : 'w-3.5 h-3.5 mx-auto text-stone-400 hover:text-stone-600'} />
+                  </button>
+                </td>
                 <td className={`${TD} text-center`}>{formatDateBR(r.data)}</td>
                 <td className={`${TD} text-right font-mono`}>{r.numeroReceita || '–'}</td>
                 <td className={`${TD} font-mono`}>{r.numeroReceitaFull}</td>
@@ -1156,6 +1172,34 @@ export const ReceitasView: React.FC = () => {
                   </div>
                 </td>
               </tr>
+              {detalhes[r.id] && (
+                <tr><td colSpan={11} className="px-10 py-2 bg-stone-50 dark:bg-stone-900/40 border-b border-stone-200 dark:border-stone-800">
+                  {detalhes[r.id] === 'carregando' ? <span className="inline-flex items-center gap-2 text-xs text-stone-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando os produtos…</span>
+                    : !(detalhes[r.id] as ProdutoReceita[]).length ? <span className="text-xs text-stone-500">Receita sem produtos.</span>
+                      : (
+                        <table className="text-xs w-auto">
+                          <thead><tr className="text-stone-500">
+                            {['Defensivo', 'Praga', 'Dose', 'Calda', 'Aplic.', 'Área', 'Qtd. a adquirir', 'Carência'].map((h, i) => <th key={h} className={`px-2 py-1 font-medium ${i >= 2 && i <= 6 ? 'text-right' : 'text-left'}`}>{h}</th>)}
+                          </tr></thead>
+                          <tbody>
+                            {(detalhes[r.id] as ProdutoReceita[]).map((p) => (
+                              <tr key={p.id} className="border-t border-stone-200 dark:border-stone-800">
+                                <td className="px-2 py-1 font-semibold">{p.defensivo}</td>
+                                <td className="px-2 py-1">{p.praga} <i className="text-stone-400">{p.pragaCientifico}</i></td>
+                                <td className="px-2 py-1 text-right font-mono">{formatDecimal(p.dose, 4)} {p.doseUn}</td>
+                                <td className="px-2 py-1 text-right font-mono">{p.calda || '–'}</td>
+                                <td className="px-2 py-1 text-right font-mono">{p.nrAplic}</td>
+                                <td className="px-2 py-1 text-right font-mono">{formatDecimal(p.area, 2)} {p.areaUn}</td>
+                                <td className="px-2 py-1 text-right font-mono">{formatDecimal(p.qtdade, 4)} {p.qtdadeUn}</td>
+                                <td className="px-2 py-1">{p.carencia}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                </td></tr>
+              )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
