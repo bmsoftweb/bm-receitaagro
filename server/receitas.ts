@@ -9,7 +9,7 @@ import { lerRecConfig } from './cadastros.js';
 import { SQL_TRATAMENTO, mapearTratamento } from './compendio.js';
 import { transmitirCidasc, bloqueioCidasc } from './cidasc.js';
 import { syncCulturasDoProduto, syncProdutosDaCultura, syncTratamentosDoProduto, syncTratamento } from './novorec.js';
-import { usaCompendioProprio, sincronizarProduto, sincronizarCultura, SO_TRATAMENTOS_PROPRIOS, ID_TRATAMENTO_PROPRIO, naoConferidos } from './compendioProprio.js';
+import { usaCompendioProprio, sincronizarProduto, compendioMudou, sincronizarCultura, SO_TRATAMENTOS_PROPRIOS, ID_TRATAMENTO_PROPRIO, naoConferidos } from './compendioProprio.js';
 import {
   doseValida, numeroReceitaFull, chavePdf, tiposAplicacaoLiberados,
 } from '../shared/receita.js';
@@ -531,8 +531,8 @@ export function createReceitasRouter() {
     const token = proprio ? null : await tokenOnline();
     let atualizou = false;
     if (proprio || token) {
-      const d = await consultarUm('SELECT DATAHORA_API d FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id: idProduto });
-      if (req.query.forcar === 'S' || vencido(d?.d)) {
+      const d = await consultarUm('SELECT DATAHORA_API d, REGISTRO_MAPA m FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id: idProduto });
+      if (req.query.forcar === 'S' || (proprio ? await compendioMudou(d?.m, d?.d) : vencido(d?.d))) {
         // O próprio é local (MySQL): já traz os tratamentos do produto inteiro
         await (proprio ? sincronizarProduto(idProduto) : syncCulturasDoProduto(idProduto, token!));
         atualizou = true;

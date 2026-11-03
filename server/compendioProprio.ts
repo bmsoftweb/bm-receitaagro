@@ -195,6 +195,24 @@ export async function sincronizarProduto(idLocal: number, idCultura = 0): Promis
   return lista.length;
 }
 
+/**
+ * O produto precisa sincronizar de novo? Só se o compêndio (produto, tratamentos ou de-para) mudou
+ * depois da última sincronização: regravar todos os tratamentos leva vários segundos no DBISAM.
+ * As datas do MySQL e o DATAHORA_API estão no horário de Brasília.
+ */
+export async function compendioMudou(mapa: unknown, desde: unknown): Promise<boolean> {
+  if (!desde) return true;
+  const [[r]] = await pool.query<any[]>(
+    `SELECT GREATEST(p.atualizado_em,
+              COALESCE((SELECT MAX(atualizado_em) FROM compendio_tratamentos WHERE produto_id = p.id), p.atualizado_em),
+              (SELECT MAX(atualizado_em) FROM compendio_depara_culturas),
+              (SELECT MAX(atualizado_em) FROM compendio_depara_pragas)) v
+       FROM compendio_produtos p WHERE p.registro_mapa = ?`,
+    [mapaLimpo(mapa)],
+  );
+  return !!r && String(r.v) > String(desde).replace('T', ' ').slice(0, 19);
+}
+
 /** IDs e MAPA de todos os defensivos locais (a bmAPI corta leituras grandes: páginas de 500) */
 async function defensivosLocais(): Promise<{ id: number; mapa: string }[]> {
   const linhas: any[] = [];

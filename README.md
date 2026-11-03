@@ -54,6 +54,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.19
+- Assistente do produto mais rápido: escolher o defensivo só regrava os tratamentos quando a bula, os
+  tratamentos ou o de-para do compêndio mudaram desde a última sincronização (de ~15 s para ~0,1 s).
+
 ### 0.0.18
 - O app passou a se chamar ReceitaAgro (título, manifesto, pacote, `ReceitaAgro.exe`). As chaves de
   sessão e tema do navegador migram sozinhas, sem deslogar ninguém.
