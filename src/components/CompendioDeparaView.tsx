@@ -77,7 +77,12 @@ export const CompendioDeparaView: React.FC = () => {
       salvar={(d) => gravar(tipo, d)}
       acoes={[{
         icone: Check, titulo: 'Confirmar', descricao: 'aceitar a correspondência sugerida', tom: 'verde',
-        executar: async (d) => { await gravar(tipo, d); return 'Correspondência confirmada.'; },
+        executar: async (d) => {
+          // Sem sugestão não há o que aceitar: confirmar só esconderia a pendência
+          if (!d.itemId) throw new Error(`Sem correspondência para confirmar. Como resolver: use Editar e escolha a ${tipo === 'culturas' ? 'cultura' : 'praga'} do catálogo.`);
+          await gravar(tipo, d);
+          return 'Correspondência confirmada.';
+        },
       }]}
       extraFormulario={(d, alterar) => (
         // Altura mínima: a lista da pesquisa abre dentro do formulário

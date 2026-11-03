@@ -54,6 +54,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.22
+- De-para do compêndio: o Confirmar não aceita mais linha sem correspondência (marcava como conferida
+  e escondia a pendência); para essas, usar o Editar e escolher a cultura/praga do catálogo.
+
 ### 0.0.21
 - Lista de receitas: a seta no começo da linha abre os produtos da receita (defensivo, praga, dose,
   calda, aplicações, área, quantidade e carência) para conferir sem abrir a receita.
