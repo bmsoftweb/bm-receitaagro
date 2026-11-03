@@ -1,5 +1,5 @@
 /**
- * Entrada do executável (ReceitaWeb.exe).
+ * Entrada do executável (ReceitaAgro.exe).
  *
  * Sobe o mesmo servidor Express da versão local, servindo o app já compilado (dist),
  * e abre o navegador padrão. Diferenças para o server.ts:
@@ -35,7 +35,7 @@ async function iniciar() {
 
   const servidor = app.listen(config.port, '0.0.0.0', () => {
     const url = `http://localhost:${config.port}`;
-    console.log(`ReceitaWeb rodando em ${url}`);
+    console.log(`ReceitaAgro rodando em ${url}`);
     console.log('Feche esta janela para encerrar o sistema.');
     if (!config.sessionSecret) console.warn('ATENÇÃO: SESSION_SECRET não configurado no .env');
     abrirNavegador(url);
@@ -44,7 +44,7 @@ async function iniciar() {
   servidor.on('error', (err: NodeJS.ErrnoException) => {
     console.error(
       err.code === 'EADDRINUSE'
-        ? `A porta ${config.port} já está em uso. Feche o outro ReceitaWeb ou mude RECEITA_PORT no .env.`
+        ? `A porta ${config.port} já está em uso. Feche o outro ReceitaAgro ou mude RECEITA_PORT no .env.`
         : `Falha ao iniciar: ${err.message}`,
     );
     aguardarTecla();
@@ -67,6 +67,6 @@ function aguardarTecla() {
 }
 
 iniciar().catch((err) => {
-  console.error('Falha crítica ao iniciar o ReceitaWeb:', err);
+  console.error('Falha crítica ao iniciar o ReceitaAgro:', err);
   aguardarTecla();
 });

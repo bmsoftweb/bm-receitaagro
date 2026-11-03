@@ -1,4 +1,4 @@
-# ReceitaWeb — Receituário Agronômico
+# ReceitaAgro — Receituário Agronômico
 
 Conversão para web do sistema Delphi de receituário (`D:\bmsoft\receita`): receitas
 agronômicas, compêndio de defensivos do **Novo Receituário Agronômico** e cadastros, sobre o
@@ -53,6 +53,15 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
   ainda protegidas por senha (`REC_CULTURAS_PRAGAS_PRODUTOS`, `REC_UFS_RESTRICOES` e afins).
 
 ## Histórico
+
+### 0.0.18
+- O app passou a se chamar ReceitaAgro (título, manifesto, pacote, `ReceitaAgro.exe`). As chaves de
+  sessão e tema do navegador migram sozinhas, sem deslogar ninguém.
+- Banco do compêndio renomeado de `receitaweb` para `receitaagro` (`scripts/renomear_banco_receitaagro.sql`).
+- Atualização do compêndio central num clique: `scripts/Atualizar compendio.cmd` roda produtos, bulas,
+  tratamentos, textos e de-para em sequência, com etapa e percentual na janela e log em `scripts/logs`.
+- Bula relida mantém conferidos os tratamentos que voltaram iguais e relê EPI e precauções quando o PDF
+  muda. Falha de download (site do AGROFIT fora do ar) não marca como erro a bula já gravada.
 
 ### 0.0.17
 - Compêndio próprio: as bulas do AGROFIT são lidas pela Claude (`scripts/carga-compendio.ts`) e gravadas

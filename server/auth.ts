@@ -5,7 +5,7 @@ import { consultarUm, executar, comServidor, servidorAtual, verificarBmapi, Bmap
 import { buscarServidor, buscarServidorPorToken, Servidor } from './servidores.js';
 
 /**
- * Autenticação do ReceitaWeb.
+ * Autenticação do ReceitaAgro.
  *
  * O login usa e-mail + senha da tabela WEB_USUARIOS (a senha fica em texto puro,
  * num campo de 15 caracteres, para compatibilidade com o app Delphi).
@@ -56,7 +56,7 @@ export function nivelSupervisor(u: UsuarioSessao) {
 
 function segredo(): string {
   if (!config.sessionSecret) {
-    throw new BmapiError('SESSION_SECRET não configurado no .env do ReceitaWeb.', 500);
+    throw new BmapiError('SESSION_SECRET não configurado no .env do ReceitaAgro.', 500);
   }
   return config.sessionSecret;
 }
@@ -245,7 +245,7 @@ async function dadosEmpresa() {
     id: config.idEmpresa,
     nome: String(e?.nome || '').trim(),
     fantasia: String(e?.fantasia || '').trim(),
-    apelido: String(e?.apelido || e?.fantasia || e?.nome || 'ReceitaWeb').trim(),
+    apelido: String(e?.apelido || e?.fantasia || e?.nome || 'ReceitaAgro').trim(),
     cnpj: String(e?.cnpj || '').trim(),
     cidade: String(e?.cidade || '').trim(),
     uf: String(e?.uf || '').trim(),

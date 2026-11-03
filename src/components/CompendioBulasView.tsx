@@ -15,7 +15,7 @@ import { BTN_PRIMARIO, BTN_SECUNDARIO, TABELA, TH, TD, TR, BTN_ACAO, BTN_ACAO_EX
 
 /**
  * Conferência do compêndio próprio: tratamentos lidos das bulas do AGROFIT pela Claude
- * (MySQL central receitaweb, scripts/carga-compendio.ts). Salvar um tratamento já o marca como conferido.
+ * (MySQL central receitaagro, scripts/carga-compendio.ts). Salvar um tratamento já o marca como conferido.
  */
 
 interface Produto {

@@ -1,4 +1,4 @@
--- Compêndio próprio a partir das bulas (MySQL central, banco receitaweb).
+-- Compêndio próprio a partir das bulas (MySQL central, banco receitaagro).
 -- Uma carga serve a todos os clientes: a bula é a mesma para todos.
 -- Criar à mão; o app não cria tabelas.
 

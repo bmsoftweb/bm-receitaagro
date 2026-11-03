@@ -5,7 +5,7 @@ import { agoraISO } from './bmapi.js';
 import { rota, idParam, texto } from './util.js';
 
 /**
- * Conferência do compêndio próprio (bulas lidas pela Claude, MySQL central receitaweb).
+ * Conferência do compêndio próprio (bulas lidas pela Claude, MySQL central receitaagro).
  * A base vale para todos os clientes: só administradores dos servidores em
  * COMPENDIO_SERVIDORES (números separados por vírgula, no .env/Vercel) entram aqui.
  */

@@ -30,7 +30,7 @@ export const config = {
     password: process.env.MYSQL_PASSWORD || '',
     database: process.env.MYSQL_DATABASE || 'bmapi',
     /** Compêndio próprio das bulas (compendio_produtos/compendio_tratamentos), no mesmo servidor */
-    databaseCompendio: process.env.MYSQL_DATABASE_COMPENDIO || 'receitaweb',
+    databaseCompendio: process.env.MYSQL_DATABASE_COMPENDIO || 'receitaagro',
   },
 
   sessionSecret: process.env.SESSION_SECRET || '',

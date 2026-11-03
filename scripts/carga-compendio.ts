@@ -1,5 +1,5 @@
 /**
- * Carga do compêndio próprio (MySQL receitaweb) a partir do AGROFIT e das bulas.
+ * Carga do compêndio próprio (MySQL receitaagro) a partir do AGROFIT e das bulas.
  * Roda local (não na Vercel). Chaves no .env: AGROAPI_*, ANTHROPIC_API_KEY.
  *
  *   npx tsx scripts/carga-compendio.ts produtos              lista do AGROFIT -> compendio_produtos
@@ -150,12 +150,19 @@ async function bulas() {
         [p.id, pdf, pdf.length],
       );
       await sql(
-        `UPDATE compendio_produtos SET hash_bula = ?, status_extracao = IF(? AND status_extracao = 'extraido', 'extraido', 'pendente'), erro_extracao = NULL WHERE id = ?`,
-        [hash, antes?.hash === hash, p.id],
+        // Bula com PDF novo: tratamentos e textos (EPI, precauções) são lidos de novo
+        `UPDATE compendio_produtos SET hash_bula = ?, status_extracao = IF(? AND status_extracao = 'extraido', 'extraido', 'pendente'),
+           textos_em = IF(?, textos_em, NULL), erro_extracao = NULL WHERE id = ?`,
+        [hash, antes?.hash === hash, antes?.hash === hash, p.id],
       );
       console.log(`${++n}/${linhas.length} ${p.registro_mapa} ${p.marca}: ${(pdf.length / 1024).toFixed(0)} KB`);
     } catch (e: any) {
-      await sql(`UPDATE compendio_produtos SET status_extracao = 'erro', erro_extracao = ? WHERE id = ?`, [corta(e.message, 500), p.id]);
+      // Falha no download (site fora do ar, 503) não estraga a bula que já está gravada: tenta de novo na próxima vez
+      await sql(
+        `UPDATE compendio_produtos SET erro_extracao = ?,
+           status_extracao = IF(EXISTS (SELECT 1 FROM compendio_bulas WHERE produto_id = ?), status_extracao, 'erro') WHERE id = ?`,
+        [corta(e.message, 500), p.id, p.id],
+      );
       console.log(`${p.registro_mapa} ${p.marca}: ERRO ${e.message}`);
     }
   }
@@ -335,18 +342,32 @@ async function gravarTratamentos(produtoId: number, dados: any, modelo: string) 
   // Leitura barata incompleta vai para o Opus; a do Opus fica, com o aviso para a conferência
   const status = !t.length ? 'erro' : baixa && !modelo.startsWith(MODELO_COMPLETO) ? 'incompleto' : 'extraido';
   const aviso = !t.length ? 'a bula não trouxe tratamentos' : baixa ? `${t.length} de ${agro} pares do AGROFIT` : null;
-  // Extração nova substitui a anterior e volta para conferência
+  // Extração nova substitui a anterior. Linha conferida que voltou igual (mesma cultura, praga e valores)
+  // continua conferida; a que mudou volta para a conferência.
+  const linhas = t.map((x) => [produtoId, corta(x.cultura, 100) || '?', corta(x.praga_comum, 200), corta(x.praga_cientifico, 200), x.dose_min, x.dose_max,
+    corta(x.unidade_dose, 50), corta(x.volume_calda, 100), x.aplic_min, x.aplic_max, x.intervalo_aplic_dias, x.carencia_dias]);
+  const chave = (v: any[]) => JSON.stringify(v.slice(1).map((c) => (c == null ? null : typeof c === 'number' ? Number(c) : String(c).trim().toUpperCase())));
   const cx = await db.getConnection();
   await cx.beginTransaction();
   try {
+    const [antes]: any = await cx.query(
+      `SELECT produto_id, cultura, praga_comum, praga_cientifico, dose_min, dose_max, unidade_dose, volume_calda, aplic_min, aplic_max,
+              intervalo_aplic_dias, carencia_dias, conferido_por, conferido_em
+         FROM compendio_tratamentos WHERE produto_id = ? AND conferido = 1`,
+      [produtoId],
+    );
+    const conferidos = new Map<string, any>(antes.map((a: any) => [chave([a.produto_id, a.cultura, a.praga_comum, a.praga_cientifico,
+      a.dose_min == null ? null : Number(a.dose_min), a.dose_max == null ? null : Number(a.dose_max), a.unidade_dose, a.volume_calda,
+      a.aplic_min, a.aplic_max, a.intervalo_aplic_dias, a.carencia_dias]), a]));
     await cx.query('DELETE FROM compendio_tratamentos WHERE produto_id = ?', [produtoId]);
     if (t.length) {
       await cx.query(
         `INSERT INTO compendio_tratamentos (produto_id, cultura, praga_comum, praga_cientifico, dose_min, dose_max, unidade_dose, volume_calda,
-           aplic_min, aplic_max, intervalo_aplic_dias, carencia_dias, epoca_aplicacao, observacao, inferido) VALUES ?`,
-        [t.map((x) => [produtoId, corta(x.cultura, 100) || '?', corta(x.praga_comum, 200), corta(x.praga_cientifico, 200), x.dose_min, x.dose_max,
-          corta(x.unidade_dose, 50), corta(x.volume_calda, 100), x.aplic_min, x.aplic_max, x.intervalo_aplic_dias, x.carencia_dias,
-          x.epoca_aplicacao, x.observacao, x.inferido ? 1 : 0])],
+           aplic_min, aplic_max, intervalo_aplic_dias, carencia_dias, epoca_aplicacao, observacao, inferido, conferido, conferido_por, conferido_em) VALUES ?`,
+        [linhas.map((l, i) => {
+          const c = conferidos.get(chave(l));
+          return [...l, t[i].epoca_aplicacao, t[i].observacao, t[i].inferido ? 1 : 0, c ? 1 : 0, c?.conferido_por ?? null, c?.conferido_em ?? null];
+        })],
       );
     }
     await cx.query(

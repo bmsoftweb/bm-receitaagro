@@ -1,10 +1,10 @@
 /**
- * Service worker do ReceitaWeb.
+ * Service worker do ReceitaAgro.
  *
  * O app só funciona com a bmAPI no ar, então nada de /api é guardado: o cache
  * serve apenas para abrir a tela (casca do app) quando a rede falha.
  */
-const CACHE = 'receitaweb-v1';
+const CACHE = 'receitaagro-v1';
 
 self.addEventListener('install', () => self.skipWaiting());
 

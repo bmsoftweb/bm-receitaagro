@@ -1,11 +1,12 @@
 export type ThemeMode = 'light' | 'dark';
 
-const STORAGE_KEY = 'receitaweb_theme';
+const STORAGE_KEY = 'receitaagro_theme';
 
 export function getInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
   try {
-    const savedTheme = localStorage.getItem(STORAGE_KEY);
+    // receitaweb_theme: chave do nome antigo
+    const savedTheme = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem('receitaweb_theme');
     if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
   } catch {}

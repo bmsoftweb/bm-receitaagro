@@ -1,7 +1,7 @@
 {
-  "name": "receitaweb",
+  "name": "receitaagro",
   "private": true,
-  "version": "0.0.17",
+  "version": "0.0.18",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "build:exe": "vite build && esbuild exe.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/receitaweb.cjs && pkg build/receitaweb.cjs --targets node20-win-x64 --output build/ReceitaWeb.exe"
+    "build:exe": "vite build && esbuild exe.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/receitaagro.cjs && pkg build/receitaagro.cjs --targets node20-win-x64 --output build/ReceitaAgro.exe"
   },
   "pkg": {
     "assets": []

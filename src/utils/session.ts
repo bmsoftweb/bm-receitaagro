@@ -1,7 +1,7 @@
 import { Empresa, ServidorInfo, Usuario } from '../types';
 
-const SESSAO = 'receitaweb_sessao';
-const TOKEN = 'receitaweb_token';
+const SESSAO = 'receitaagro_sessao';
+const TOKEN = 'receitaagro_token';
 
 export interface SessaoSalva {
   token: string;
@@ -13,6 +13,17 @@ export interface SessaoSalva {
 function seguro<T>(fn: () => T, padrao: T): T {
   try { return fn(); } catch { return padrao; }
 }
+
+// Chaves do nome antigo (ReceitaWeb): passa para as novas uma vez, sem deslogar ninguém
+seguro(() => {
+  for (const s of [localStorage, sessionStorage]) {
+    for (const [antiga, nova] of [['receitaweb_sessao', SESSAO], ['receitaweb_token', TOKEN]]) {
+      const valor = s.getItem(antiga);
+      if (valor !== null && s.getItem(nova) === null) s.setItem(nova, valor);
+      s.removeItem(antiga);
+    }
+  }
+}, undefined);
 
 export function lerSessao(): SessaoSalva | null {
   return seguro(() => {

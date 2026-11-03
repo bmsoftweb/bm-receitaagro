@@ -1,6 +1,6 @@
 {
-  "name": "ReceitaWeb — Receituário Agronômico",
-  "short_name": "ReceitaWeb",
+  "name": "ReceitaAgro — Receituário Agronômico",
+  "short_name": "ReceitaAgro",
   "description": "Ordens de produção, insumos, lotes e custos via bmAPI.",
   "start_url": "/",
   "scope": "/",

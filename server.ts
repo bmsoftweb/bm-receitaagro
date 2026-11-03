@@ -26,13 +26,13 @@ async function startServer() {
   }
 
   app.listen(config.port, '0.0.0.0', () => {
-    console.log(`ReceitaWeb rodando em http://0.0.0.0:${config.port}`);
+    console.log(`ReceitaAgro rodando em http://0.0.0.0:${config.port}`);
     console.log(`bmAPI: empresa ${config.idEmpresa}`);
     if (!config.sessionSecret) console.warn('ATENÇÃO: SESSION_SECRET não configurado no .env');
   });
 }
 
 startServer().catch((err) => {
-  console.error('Falha crítica ao iniciar o ReceitaWeb:', err);
+  console.error('Falha crítica ao iniciar o ReceitaAgro:', err);
   process.exit(1);
 });
