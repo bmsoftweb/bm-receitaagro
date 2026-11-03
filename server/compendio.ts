@@ -5,6 +5,7 @@ import {
 } from './bmapi.js';
 import { rota, rotaProgresso, texto, maiusculo, idParam, busca, semAcento } from './util.js';
 import { atualizarCatalogo, acertarTabelas, buscarTratamentosDoProduto } from './novorec.js';
+import { usaCompendioProprio, atualizarCatalogoProprio, sincronizarProduto, ID_PRODUTO_PROPRIO, SO_TRATAMENTOS_PROPRIOS } from './compendioProprio.js';
 import { atualizarTabelasCidasc } from './cidasc.js';
 
 /**
@@ -138,9 +139,10 @@ export function createCompendioRouter() {
   r.get('/defensivos', rota(async (req, res) => {
     const rows = await consultar(
       `SELECT A.ID id, A.NOME nome, A.REGISTRO_MAPA mapa, A.ATIVO ativo, B.ID id_def, B.ID_BM id_bm,
-              B.ID_CIDASC id_cidasc, B.MANUAL manual
+              B.ID_CIDASC id_cidasc, B.MANUAL manual, C.CSSITUACAO sit_cidasc
          FROM REC_NOVOREC_DEFENSIVOS A
          LEFT JOIN REC_DEFENSIVOS B ON B.ID_NOVOREC = A.ID
+         LEFT JOIN REC_DEFENSIVOS_CIDASC C ON C.IDAGROTOXICO = B.ID_CIDASC
         WHERE UPPER(A.NOME) LIKE :q
         ORDER BY A.NOME TOP 501`,
       { q: busca(req.query.q) },
@@ -158,6 +160,7 @@ export function createCompendioRouter() {
         idBm: Number(d.id_bm || 0),
         idCidasc: Number(d.id_cidasc || 0),
         cidascManual: String(d.manual || '').trim() === 'S',
+        situacaoCidasc: String(d.sit_cidasc || '').trim().toUpperCase(),
         tratamentos: qtd.get(Number(d.id)) || 0,
       })),
     });
@@ -171,8 +174,8 @@ export function createCompendioRouter() {
 
   r.post('/defensivos', rota(async (req, res) => {
     const d = dadosDefensivo(req.body || {});
-    // O id é o da API; defensivo criado à mão recebe um id acima de 900000 para não colidir
-    const ult = await consultarUm('SELECT MAX(ID) m FROM REC_NOVOREC_DEFENSIVOS');
+    // O id é o da API; defensivo criado à mão recebe um id acima de 900000 (e abaixo dos do compêndio próprio) para não colidir
+    const ult = await consultarUm(`SELECT MAX(ID) m FROM REC_NOVOREC_DEFENSIVOS WHERE ID < ${ID_PRODUTO_PROPRIO}`);
     const id = Math.max(900000, Number(ult?.m || 0)) + 1;
     await executar('INSERT INTO REC_NOVOREC_DEFENSIVOS (ID, NOME, REGISTRO_MAPA, ATIVO) VALUES (:id, :nome, :mapa, :ativo)', { id, ...d });
     res.json({ id });
@@ -292,7 +295,8 @@ export function createCompendioRouter() {
   }));
 
   // ---- Ações da API e manutenção ----
-  r.post('/defensivos/atualizar', rotaProgresso((progresso) => atualizarCatalogo(progresso)));
+  // Modo próprio (padrão): compêndio das bulas; a API do Novo Receituário só com COMPENDIO_PROPRIO=N
+  r.post('/defensivos/atualizar', rotaProgresso((progresso) => (usaCompendioProprio() ? atualizarCatalogoProprio(progresso) : atualizarCatalogo(progresso))));
 
   /** Tabela da CIDASC inteira para conferência, lida em páginas pelo código (a bmAPI corta resultados grandes) */
   const TABELAS_CIDASC: Record<string, string> = {
@@ -361,7 +365,8 @@ export function createCompendioRouter() {
   }));
 
   r.post('/defensivos/:id/buscar-tratamentos', rota(async (req, res) => {
-    res.json({ consultas: await buscarTratamentosDoProduto(idParam(req)) });
+    const id = idParam(req);
+    res.json({ consultas: await (usaCompendioProprio() ? sincronizarProduto(id) : buscarTratamentosDoProduto(id)) });
   }));
 
   /** Limpa a data da última consulta: a próxima receita busca os dados de novo na API */
@@ -379,7 +384,7 @@ export function createCompendioRouter() {
     const id = idParam(req);
     const def = await consultarUm('SELECT NOME nome, REGISTRO_MAPA mapa FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id });
     if (!def) throw new BmapiError('Defensivo não encontrado.', 404);
-    const ult = await consultarUm('SELECT MAX(ID) m FROM REC_NOVOREC_DEFENSIVOS');
+    const ult = await consultarUm(`SELECT MAX(ID) m FROM REC_NOVOREC_DEFENSIVOS WHERE ID < ${ID_PRODUTO_PROPRIO}`);
     const novo = Math.max(900000, Number(ult?.m || 0)) + 1;
     const ultT = await consultarUm('SELECT MAX(ID) m FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO');
     const base = Math.max(900000000, Number(ultT?.m || 0));
@@ -398,7 +403,9 @@ export function createCompendioRouter() {
 
   // ======================= Tratamentos =======================
   r.get('/defensivos/:id/tratamentos', rota(async (req, res) => {
-    const rows = await consultar(`${SQL_TRATAMENTO} WHERE A.ID_PRODUTO = :id ORDER BY C.NOME, P.NOME, A.SEQ`, { id: idParam(req) });
+    // Modo próprio: só os do compêndio e os incluídos à mão (os antigos da API ficam na base, ocultos)
+    const filtro = usaCompendioProprio() ? ` AND ${SO_TRATAMENTOS_PROPRIOS}` : '';
+    const rows = await consultar(`${SQL_TRATAMENTO} WHERE A.ID_PRODUTO = :id${filtro} ORDER BY C.NOME, P.NOME, A.SEQ`, { id: idParam(req) });
     res.json(rows.map(mapearTratamento));
   }));
 

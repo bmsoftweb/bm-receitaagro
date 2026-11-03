@@ -29,6 +29,8 @@ export const config = {
     user: process.env.MYSQL_USER || 'bmsoftadm',
     password: process.env.MYSQL_PASSWORD || '',
     database: process.env.MYSQL_DATABASE || 'bmapi',
+    /** Compêndio próprio das bulas (compendio_produtos/compendio_tratamentos), no mesmo servidor */
+    databaseCompendio: process.env.MYSQL_DATABASE_COMPENDIO || 'receitaweb',
   },
 
   sessionSecret: process.env.SESSION_SECRET || '',
@@ -37,6 +39,8 @@ export const config = {
   get idEmpresa() { return inteiro(valor('ID_EMPRESA'), 1); },
   /** Exige o número CIDASC (enviado pelo receita_e.exe) para imprimir; padrão S, como no Delphi */
   get exigeCidascParaImprimir() { return simNao(valor('EXIGE_CIDASC_IMPRESSAO'), true); },
+  /** Tratamentos do compêndio próprio (bulas lidas pela Claude) em vez da API do Novo Receituário; padrão S (N volta para a API) */
+  get compendioProprio() { return simNao(valor('COMPENDIO_PROPRIO'), true); },
 };
 
 /** Configurações que o frontend precisa conhecer (sem nada sensível) */

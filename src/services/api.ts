@@ -36,6 +36,13 @@ export async function get<T = any>(url: string): Promise<T> {
   return parseOrThrow(await fetch(url, { headers: headers() }));
 }
 
+/** Arquivo (PDF etc.) com o token da sessão; erro vem como JSON */
+export async function getBlob(url: string): Promise<Blob> {
+  const res = await fetch(url, { headers: headers() });
+  if (!res.ok) return parseOrThrow(res);
+  return res.blob();
+}
+
 export async function send<T = any>(method: string, url: string, body?: unknown): Promise<T> {
   return parseOrThrow(
     await fetch(url, {

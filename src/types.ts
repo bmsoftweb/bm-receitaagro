@@ -75,6 +75,8 @@ export interface Tratamento {
   frase2: string;
   estadosRestritos: string;
   restricaoAplicacao: string;
+  /** Compêndio próprio: lido da bula e ainda não conferido pela BMsoft */
+  naoConferido?: boolean;
 }
 
 export interface ProdutoReceita {

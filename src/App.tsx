@@ -7,7 +7,7 @@ import {
   atualizarSessao,
   SessaoSalva,
 } from './utils/session';
-import { setTokenSessao, onSessaoExpirada, fetchDbStatus } from './services/api';
+import { setTokenSessao, onSessaoExpirada, fetchDbStatus, get } from './services/api';
 import { LoginView } from './components/LoginView';
 import { Sidebar, NavTab, NAV_TABS } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -20,6 +20,8 @@ import {
 import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { MovimentoView } from './components/MovimentoView';
 import { TabelasCidascView } from './components/TabelasCidascView';
+import { CompendioBulasView } from './components/CompendioBulasView';
+import { CompendioDeparaView } from './components/CompendioDeparaView';
 import { MeusDadosModal } from './components/MeusDadosModal';
 import { Toast } from './components/Toast';
 
@@ -29,6 +31,7 @@ export const App: React.FC = () => {
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<DbConnectionStatus | null>(null);
   const [meusDadosAberto, setMeusDadosAberto] = useState(false);
+  const [conferente, setConferente] = useState(false);
 
   // Inicializa token da API
   useEffect(() => {
@@ -43,6 +46,12 @@ export const App: React.FC = () => {
     } else {
       setTokenSessao(null);
     }
+  }, [sessao?.token]);
+
+  // Conferência das bulas: só administradores dos servidores da BMsoft
+  useEffect(() => {
+    setConferente(false);
+    if (sessao?.token) get<{ pode: boolean }>('/api/compendio-bulas/acesso').then((r) => setConferente(r.pode)).catch(() => {});
   }, [sessao?.token]);
 
   // Handler de expiração de token (401)
@@ -110,6 +119,8 @@ export const App: React.FC = () => {
     configuracoes: 'Configurações',
     movimento: 'Movimento de agrotóxicos (CIDASC)',
     tabelasCidasc: 'Tabelas da CIDASC (SIGEN)',
+    compendioBulas: 'Conferência das bulas (compêndio próprio)',
+    compendioDepara: 'De-para de culturas e pragas (compêndio próprio)',
   };
 
   const titulo = titulosPorAba[activeTab] || titulosPorAba.dashboard;
@@ -129,6 +140,7 @@ export const App: React.FC = () => {
         }}
         isOpenMobile={sidebarMobileOpen}
         onCloseMobile={() => setSidebarMobileOpen(false)}
+        ocultar={conferente ? [] : ['compendioBulas', 'compendioDepara']}
       />
 
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -164,7 +176,7 @@ export const App: React.FC = () => {
                   <span>•</span>
                   <span>Integração via bmAPI</span>
                   <span>•</span>
-                  <span>Compêndio Novo Receituário</span>
+                  <span>Compêndio próprio (bulas)</span>
                 </div>
               </div>
             </footer>
@@ -183,6 +195,8 @@ export const App: React.FC = () => {
             {activeTab === 'configuracoes' && <ConfiguracoesView />}
             {activeTab === 'movimento' && <MovimentoView />}
             {activeTab === 'tabelasCidasc' && <TabelasCidascView />}
+            {activeTab === 'compendioBulas' && conferente && <CompendioBulasView />}
+            {activeTab === 'compendioDepara' && conferente && <CompendioDeparaView />}
           </main>
         )}
       </div>

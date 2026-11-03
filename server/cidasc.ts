@@ -22,6 +22,19 @@ const ORIENTACAO =
 const virgula = (v: number, casas?: number) => (casas === undefined ? String(v) : v.toFixed(casas)).replace('.', ',');
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
+/** csSituacao do Agrotoxico/Pesquisar: só LI (liberado) pode ser receitado em SC */
+const SITUACOES: Record<string, string> = { LI: 'liberado', CA: 'cancelado', SU: 'suspenso' };
+export const situacaoTexto = (sit: string) => SITUACOES[sit] || `situação "${sit}"`;
+
+/** Mensagem de bloqueio quando o agrotóxico não está liberado na CIDASC; '' quando pode (ou sem a tabela baixada) */
+export async function bloqueioCidasc(idCidasc: number): Promise<string> {
+  if (!idCidasc) return '';
+  const a = await consultarUm('SELECT NMMARCACOMERCIAL nome, CSSITUACAO sit FROM REC_DEFENSIVOS_CIDASC WHERE IDAGROTOXICO = :id', { id: idCidasc });
+  const sit = s(a?.sit).toUpperCase();
+  if (!sit || sit === 'LI') return '';
+  return `${s(a.nome)} está ${situacaoTexto(sit)} na CIDASC e não pode ser receitado em SC. Como resolver: escolha outro produto; se o registro já foi liberado de novo, atualize em Tabelas CIDASC ("Atualizar do SIGEN").`;
+}
+
 /** Mensagens de erro: { Msg: [] } (400/401) ou { Data: { Msg: [] } } */
 export function mensagens(corpo: any): string {
   const lista = corpo?.Msg ?? corpo?.Data?.Msg;
@@ -60,7 +73,7 @@ export async function loginSigen(url: string, usuario: string, senha: string): P
 }
 
 /** Consistências do Delphi antes de transmitir; devolve os dados já prontos para o JSON */
-async function montar(id: number) {
+async function montar(id: number, cancelar: boolean) {
   const r = await consultarUm(
     `SELECT A.ID id, A.NUMERO_RECEITA nr, A.NUMERO_RECEITA_FULL full, A.NUMERO_RECEITA_CIDASC cidasc, A.DATA data,
             A.CODIGO_IBGE ibge, A.NOME_PROPRIEDADE propriedade, A.ID_LOCALIDADE localidade, A.ID_TIPO_LOGRADOURO tipo,
@@ -110,6 +123,8 @@ async function montar(id: number) {
     const modalidade = await lerMemo('SELECT MODO_APLICACAO FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id', { id: p.tratamento });
     const precaucao = await lerMemo('SELECT PRECAUCOES_USO FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO WHERE ID = :id', { id: p.tratamento });
     if (!n(p.def)) erro(`ID (CIDASC) do ${nr} agrotóxico inválido!`, 'na tela Defensivos, use "Vincular CIDASC" no defensivo e depois altere o produto na receita (Finalizar) para gravar o código.');
+    const bloqueio = cancelar ? '' : await bloqueioCidasc(n(p.def));
+    if (bloqueio) erros.push(`${nr} produto: ${bloqueio}`);
     if (!n(p.un_qtd)) erro(`ID (CIDASC) da unidade adquirida do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN a adquirir (CIDASC)".');
     if (!n(p.un_area)) erro(`ID (CIDASC) da unidade da área do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN da área" (normalmente HA).');
     if (!n(p.un_dose)) erro(`ID (CIDASC) da unidade da dose do ${nr} agrotóxico inválida!`, 'altere o produto na receita e escolha a "UN da dose (CIDASC)".');
@@ -166,7 +181,7 @@ async function montar(id: number) {
 
 /** Transmite (ou cancela) a receita no SIGEN; devolve a mensagem para o usuário */
 export async function transmitirCidasc(id: number, cancelar = false): Promise<string> {
-  const { r, url, corpo } = await montar(id);
+  const { r, url, corpo } = await montar(id, cancelar);
   if (!n(r.nr)) throw new BmapiError('Receita ainda sem número!');
   if (cancelar) {
     if (!n(r.cidasc)) throw new BmapiError('Receita ainda não foi enviada para a CIDASC.');

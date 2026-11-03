@@ -39,6 +39,9 @@ const pool = mysql.createPool({
   connectionLimit: 5,
   connectTimeout: 20000,
   enableKeepAlive: true,
+  // O MySQL derruba conexão parada (ECONNRESET): fecha as ociosas antes de serem reaproveitadas
+  maxIdle: 0,
+  idleTimeout: 20000,
 });
 
 /** Junta url e port da tabela: aceita url com ou sem protocolo, barra final ou porta */

@@ -7,8 +7,9 @@ import {
 import { rota, texto, idParam, busca } from './util.js';
 import { lerRecConfig } from './cadastros.js';
 import { SQL_TRATAMENTO, mapearTratamento } from './compendio.js';
-import { transmitirCidasc } from './cidasc.js';
+import { transmitirCidasc, bloqueioCidasc } from './cidasc.js';
 import { syncCulturasDoProduto, syncProdutosDaCultura, syncTratamentosDoProduto, syncTratamento } from './novorec.js';
+import { usaCompendioProprio, sincronizarProduto, sincronizarCultura, SO_TRATAMENTOS_PROPRIOS, ID_TRATAMENTO_PROPRIO, naoConferidos } from './compendioProprio.js';
 import {
   doseValida, numeroReceitaFull, chavePdf, tiposAplicacaoLiberados,
 } from '../shared/receita.js';
@@ -198,7 +199,7 @@ export function createReceitasRouter() {
       unDerivadas: unDerivadas.map((u) => ({ id: n(u.id), un: s(u.un), descricao: s(u.descricao), idEmpregada: n(u.empregada) })),
       unCidasc: unCidasc.map((u) => ({ id: n(u.id), sigla: s(u.sigla), descricao: s(u.descricao) })),
       tiposAplicacao: restricoes.map((t) => ({ id: n(t.id), descricao: s(t.descricao) })),
-      compendioOnline: Boolean(cfg.tokenNovoRec && cfg.compendioOnline),
+      compendioOnline: usaCompendioProprio() || Boolean(cfg.tokenNovoRec && cfg.compendioOnline),
       receitasLiberadas: !cfg.usaSistemasTerceiros,
     });
   }));
@@ -491,18 +492,20 @@ export function createReceitasRouter() {
     // Receita ainda não gravada (id 0): a cultura vem na consulta
     const id = Number(req.params.id) || 0;
     const idCultura = id ? n((await carregarReceita(id)).id_cultura) : Number(req.query.cultura) || 0;
-    const token = await tokenOnline();
-    if (token) {
+    const proprio = usaCompendioProprio();
+    const token = proprio ? null : await tokenOnline();
+    if (proprio || token) {
       const c = await consultarUm('SELECT DATAHORA_API d FROM REC_NOVOREC_CULTURAS WHERE ID = :id', { id: idCultura });
-      if (req.query.forcar === 'S' || vencido(c?.d)) await syncProdutosDaCultura(idCultura, token);
+      if (req.query.forcar === 'S' || vencido(c?.d)) await (proprio ? sincronizarCultura(idCultura) : syncProdutosDaCultura(idCultura, token!));
     }
     const somenteBm = req.query.bm !== 'N';
     const rows = await consultar(
       `SELECT A.ID id, A.NOME nome, A.REGISTRO_MAPA mapa, B.ID id_def, B.ID_CIDASC id_cidasc, C.ID_BM id_bm,
-              D.DESCRICAO descricao_bm, D.UNVENDA un, E.REFERENCIA referencia,
+              D.DESCRICAO descricao_bm, D.UNVENDA un, E.REFERENCIA referencia, G.CSSITUACAO sit_cidasc,
               F.ESTOQUE - F.RESV_DAV - F.RESV_OS - F.RESV_PV - F.RESV_EF estoque
          FROM REC_NOVOREC_DEFENSIVOS A
          LEFT JOIN REC_DEFENSIVOS B ON B.ID_NOVOREC = A.ID
+         LEFT JOIN REC_DEFENSIVOS_CIDASC G ON G.IDAGROTOXICO = B.ID_CIDASC
          LEFT JOIN REC_DEFENSIVOS_BM C ON C.ID_DEF = B.ID
          LEFT JOIN PRODUTOSPRINCIPAL D ON D.ID = C.ID_BM
          LEFT JOIN PRODUTOSREFERENCIA E ON E.ID_PRODUTO = D.ID
@@ -517,18 +520,21 @@ export function createReceitasRouter() {
     res.json(rows.map((d) => ({
       id: n(d.id), nome: s(d.nome), registroMapa: s(d.mapa), idDef: n(d.id_def), idCidasc: n(d.id_cidasc),
       idBm: n(d.id_bm), descricaoBm: s(d.descricao_bm), un: s(d.un), referencia: s(d.referencia), estoque: n(d.estoque),
+      situacaoCidasc: s(d.sit_cidasc).toUpperCase(),
     })));
   }));
 
   /** 2. Culturas do defensivo */
   r.get('/receitas/assistente/culturas', rota(async (req, res) => {
     const idProduto = Number(req.query.produto) || 0;
-    const token = await tokenOnline();
+    const proprio = usaCompendioProprio();
+    const token = proprio ? null : await tokenOnline();
     let atualizou = false;
-    if (token) {
+    if (proprio || token) {
       const d = await consultarUm('SELECT DATAHORA_API d FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id: idProduto });
       if (req.query.forcar === 'S' || vencido(d?.d)) {
-        await syncCulturasDoProduto(idProduto, token);
+        // O próprio é local (MySQL): já traz os tratamentos do produto inteiro
+        await (proprio ? sincronizarProduto(idProduto) : syncCulturasDoProduto(idProduto, token!));
         atualizou = true;
       }
     }
@@ -545,8 +551,10 @@ export function createReceitasRouter() {
   r.get('/receitas/assistente/pragas', rota(async (req, res) => {
     const idProduto = Number(req.query.produto) || 0;
     const idCultura = Number(req.query.cultura) || 0;
-    const token = req.query.atualizar === 'S' ? await tokenOnline() : null;
+    const proprio = usaCompendioProprio();
+    const token = req.query.atualizar === 'S' && !proprio ? await tokenOnline() : null;
     // Tratamentos da cultura no produto de uma vez (relacoes/simple), já com as pragas
+    if (req.query.atualizar === 'S' && proprio) await sincronizarProduto(idProduto, idCultura);
     if (token) await syncTratamentosDoProduto(idProduto, token, idCultura);
     const pragas = await consultar(
       `SELECT A.ID_PRAGA id, B.NOME nome, B.NOME_CIENTIFICO cientifico, B.ID_CIDASC id_cidasc
@@ -557,7 +565,7 @@ export function createReceitasRouter() {
     );
     const contagem = await consultar(
       `SELECT ID_PRAGA id, COUNT(*) q FROM REC_NOVOREC_CULTURA_PRAGA_PRODUTO
-        WHERE ID_PRODUTO = :p AND ID_CULTURA = :c GROUP BY ID_PRAGA`,
+        WHERE ID_PRODUTO = :p AND ID_CULTURA = :c ${proprio ? `AND ID >= ${ID_TRATAMENTO_PROPRIO}` : ''} GROUP BY ID_PRAGA`,
       { p: idProduto, c: idCultura },
     );
     const qtd = new Map(contagem.map((c) => [n(c.id), n(c.q)]));
@@ -569,13 +577,18 @@ export function createReceitasRouter() {
   /** 4. Tratamentos (dosagens) da praga */
   r.get('/receitas/assistente/tratamentos', rota(async (req, res) => {
     const [p, c, g] = [Number(req.query.produto) || 0, Number(req.query.cultura) || 0, Number(req.query.praga) || 0];
-    const token = req.query.atualizar === 'S' ? await tokenOnline() : null;
+    const proprio = usaCompendioProprio();
+    const token = req.query.atualizar === 'S' && !proprio ? await tokenOnline() : null;
+    if (req.query.atualizar === 'S' && proprio) await sincronizarProduto(p, c);
     if (token) await syncTratamento(p, c, g, token);
     const rows = await consultar(
-      `${SQL_TRATAMENTO} WHERE A.ID_PRODUTO = :p AND A.ID_CULTURA = :c AND A.ID_PRAGA = :g ORDER BY A.SEQ`,
+      `${SQL_TRATAMENTO} WHERE A.ID_PRODUTO = :p AND A.ID_CULTURA = :c AND A.ID_PRAGA = :g ${proprio ? `AND ${SO_TRATAMENTOS_PROPRIOS}` : ''} ORDER BY A.SEQ`,
       { p, c, g },
     );
-    res.json(rows.map(mapearTratamento));
+    const tratamentos = rows.map(mapearTratamento);
+    // Compêndio próprio: avisa na receita o que o agrônomo da BMsoft ainda não conferiu com a bula
+    const pendentes = proprio ? await naoConferidos(tratamentos.map((t) => t.id)) : new Set<number>();
+    res.json(tratamentos.map((t) => ({ ...t, naoConferido: pendentes.has(t.id) })));
   }));
 
   /** Equipamento de aplicação é o único texto do tratamento editável na receita */
@@ -615,6 +628,8 @@ export function createReceitasRouter() {
     if (!trat) throw new BmapiError('Tratamento não encontrado. Refaça a escolha do produto.');
     const t = mapearTratamento(trat);
     const def = await defensivoCidasc(t.idProduto);
+    const bloqueio = await bloqueioCidasc(n(def?.id_cidasc));
+    if (bloqueio) throw new BmapiError(bloqueio);
     const cult = await consultarUm('SELECT ID_CIDASC c FROM REC_NOVOREC_CULTURAS WHERE ID = :id', { id: t.idCultura });
     const praga = await consultarUm('SELECT ID_CIDASC c FROM REC_NOVOREC_PRAGAS WHERE ID = :id', { id: t.idPraga });
 

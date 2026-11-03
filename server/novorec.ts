@@ -256,35 +256,8 @@ export async function atualizarCatalogo(progresso: Progresso = () => {}): Promis
       : `INSERT INTO REC_NOVOREC_DEFENSIVOS (ID, NOME, REGISTRO_MAPA, ATIVO) VALUES (${id}, ${nome}, ${mapa}, ${ativo})`;
   }), (f, t) => progresso('Gravando os defensivos', f, t));
 
-  // Ponte REC_DEFENSIVOS por registro MAPA e código CIDASC (só onde não foi ajustado à mão).
-  // O MAPA se repete entre produtos (na API e na tabela da CIDASC): só liga quando ele é de um
-  // produto só, e só linhas ainda sem produto (sobrescrever juntava produtos diferentes e o INSERT
-  // abaixo recriava os outros a cada atualização).
-  const [mapasNr, mapasCidasc] = [tabelaMemoria('MN'), tabelaMemoria('MC')];
   progresso('Ligando os defensivos pelo registro MAPA');
-  try {
-    // A tabela em memória criada no mesmo script não abre ("Error creating table handle"): cria antes
-    await executarScript([
-      `SELECT REGISTRO_MAPA MAPA, COUNT(*) N INTO ${mapasNr} FROM REC_NOVOREC_DEFENSIVOS GROUP BY REGISTRO_MAPA`,
-      `SELECT NRREGISTROMAPA MAPA, COUNT(*) N INTO ${mapasCidasc} FROM REC_DEFENSIVOS_CIDASC GROUP BY NRREGISTROMAPA`,
-    ]);
-    await executarScript([
-      `UPDATE REC_DEFENSIVOS A SET ID_NOVOREC = B.ID FROM REC_DEFENSIVOS A
-         INNER JOIN REC_NOVOREC_DEFENSIVOS B ON B.REGISTRO_MAPA = A.ID_MAPA
-         INNER JOIN ${mapasNr} U ON U.MAPA = B.REGISTRO_MAPA
-        WHERE A.ID_NOVOREC IS NULL AND A.ID_MAPA <> '' AND U.N = 1`,
-      `INSERT INTO REC_DEFENSIVOS (ID_NOVOREC, ID_MAPA)
-         SELECT B.ID, B.REGISTRO_MAPA FROM REC_NOVOREC_DEFENSIVOS B
-          WHERE B.ID NOT IN (SELECT ID_NOVOREC FROM REC_DEFENSIVOS WHERE ID_NOVOREC IS NOT NULL)`,
-      `UPDATE REC_DEFENSIVOS A SET ID_CIDASC = C.IDAGROTOXICO FROM REC_DEFENSIVOS A
-         INNER JOIN REC_DEFENSIVOS_CIDASC C ON C.NRREGISTROMAPA = A.ID_MAPA
-         INNER JOIN ${mapasCidasc} U ON U.MAPA = C.NRREGISTROMAPA
-        WHERE (A.MANUAL IS NULL OR A.MANUAL <> 'S') AND A.ID_MAPA <> '' AND U.N = 1`,
-    ]);
-  } finally {
-    await executar(`DROP TABLE IF EXISTS ${mapasNr};
-DROP TABLE IF EXISTS ${mapasCidasc}`).catch(() => {});
-  }
+  await ligarDefensivos();
   // Código CIDASC que a API já manda (codigo_cidasc) vale mais que o achado pelo MAPA; o vínculo manual continua
   await executarScript(produtos.filter((p) => inteiro(p.codigo_cidasc) > 0).map((p) => {
     const c = sqlInteiro(inteiro(p.codigo_cidasc));
@@ -312,8 +285,50 @@ DROP TABLE IF EXISTS ${mapasCidasc}`).catch(() => {});
   const culturas = await upsertNomes('REC_NOVOREC_CULTURAS', `culturas${filtro}`, 'culturas');
   const pragas = await upsertNomes('REC_NOVOREC_PRAGAS', `problemas${filtro}`, 'pragas');
 
-  // Sem codigo_cidasc na API: código CIDASC pelo nome (culturas) e pelo nome científico (pragas)
   progresso('Ligando culturas e pragas à CIDASC');
+  await ligarCulturasPragasCidasc();
+
+  progresso('Refazendo os vínculos entre culturas, pragas e produtos');
+  await acertarTabelas();
+  await executar(`UPDATE REC_CONFIG SET DATA_CATALOGO_NOVOREC = ${sqlData(proxima)}`).catch(() => {});
+  return { defensivos: produtos.length, culturas, pragas, desde };
+}
+
+/**
+ * Ponte REC_DEFENSIVOS por registro MAPA e código CIDASC (só onde não foi ajustado à mão).
+ * O MAPA se repete entre produtos (na API e na tabela da CIDASC): só liga quando ele é de um
+ * produto só, e só linhas ainda sem produto (sobrescrever juntava produtos diferentes e o INSERT
+ * abaixo recriava os outros a cada atualização). Usada também pelo compêndio próprio.
+ */
+export async function ligarDefensivos() {
+  const [mapasNr, mapasCidasc] = [tabelaMemoria('MN'), tabelaMemoria('MC')];
+  try {
+    // A tabela em memória criada no mesmo script não abre ("Error creating table handle"): cria antes
+    await executarScript([
+      `SELECT REGISTRO_MAPA MAPA, COUNT(*) N INTO ${mapasNr} FROM REC_NOVOREC_DEFENSIVOS GROUP BY REGISTRO_MAPA`,
+      `SELECT NRREGISTROMAPA MAPA, COUNT(*) N INTO ${mapasCidasc} FROM REC_DEFENSIVOS_CIDASC GROUP BY NRREGISTROMAPA`,
+    ]);
+    await executarScript([
+      `UPDATE REC_DEFENSIVOS A SET ID_NOVOREC = B.ID FROM REC_DEFENSIVOS A
+         INNER JOIN REC_NOVOREC_DEFENSIVOS B ON B.REGISTRO_MAPA = A.ID_MAPA
+         INNER JOIN ${mapasNr} U ON U.MAPA = B.REGISTRO_MAPA
+        WHERE A.ID_NOVOREC IS NULL AND A.ID_MAPA <> '' AND U.N = 1`,
+      `INSERT INTO REC_DEFENSIVOS (ID_NOVOREC, ID_MAPA)
+         SELECT B.ID, B.REGISTRO_MAPA FROM REC_NOVOREC_DEFENSIVOS B
+          WHERE B.ID NOT IN (SELECT ID_NOVOREC FROM REC_DEFENSIVOS WHERE ID_NOVOREC IS NOT NULL)`,
+      `UPDATE REC_DEFENSIVOS A SET ID_CIDASC = C.IDAGROTOXICO FROM REC_DEFENSIVOS A
+         INNER JOIN REC_DEFENSIVOS_CIDASC C ON C.NRREGISTROMAPA = A.ID_MAPA
+         INNER JOIN ${mapasCidasc} U ON U.MAPA = C.NRREGISTROMAPA
+        WHERE (A.MANUAL IS NULL OR A.MANUAL <> 'S') AND A.ID_MAPA <> '' AND U.N = 1`,
+    ]);
+  } finally {
+    await executar(`DROP TABLE IF EXISTS ${mapasNr};
+DROP TABLE IF EXISTS ${mapasCidasc}`).catch(() => {});
+  }
+}
+
+/** Sem codigo_cidasc na API: código CIDASC pelo nome (culturas) e pelo nome científico (pragas) */
+export async function ligarCulturasPragasCidasc() {
   await executarScript([
     `UPDATE REC_NOVOREC_CULTURAS A SET ID_CIDASC = B.IDNOMECOMUMESPECIEVEGETAL FROM REC_NOVOREC_CULTURAS A
        INNER JOIN REC_CULTURAS_CIDASC B ON UPPER(B.NMCOMUMESPECIEVEGERAL) = UPPER(A.NOME)
@@ -322,11 +337,6 @@ DROP TABLE IF EXISTS ${mapasCidasc}`).catch(() => {});
        INNER JOIN REC_PRAGAS_CIDASC B ON UPPER(B.NMCIENTIFICOPRAGA) = UPPER(A.NOME_CIENTIFICO)
       WHERE A.ID_CIDASC IS NULL OR A.ID_CIDASC = 0`,
   ]);
-
-  progresso('Refazendo os vínculos entre culturas, pragas e produtos');
-  await acertarTabelas();
-  await executar(`UPDATE REC_CONFIG SET DATA_CATALOGO_NOVOREC = ${sqlData(proxima)}`).catch(() => {});
-  return { defensivos: produtos.length, culturas, pragas, desde };
 }
 
 /** Refaz as tabelas de vínculo a partir dos tratamentos (qrAcertaNovoRec) */

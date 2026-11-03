@@ -54,6 +54,21 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.17
+- Compêndio próprio: as bulas do AGROFIT são lidas pela Claude (`scripts/carga-compendio.ts`) e gravadas
+  no MySQL `receitaweb` (tabelas em `scripts/compendio_mysql.sql`), com tratamentos, EPI, precauções,
+  local de aplicação e antídoto. Virou o padrão de todo o app (receita, Atualizar catálogo, Buscar
+  tratamentos e lista de tratamentos dos Defensivos); `COMPENDIO_PROPRIO=N` no `servidores.config`
+  volta o cliente para a API do Novo Receituário, que continua no código.
+- De-para das culturas e pragas da bula para o catálogo (`scripts/depara-compendio.ts`) e tela
+  "De-para do compêndio" para acertar o que não casou.
+- Tela "Conferência das bulas" para conferir dose e carência de cada tratamento com a bula, só para
+  administradores dos servidores em `COMPENDIO_SERVIDORES`. Tratamento ainda não conferido aparece
+  com aviso na receita.
+- Produtos que só existem no compêndio ganham a linha em REC_DEFENSIVOS com o código CIDASC pelo
+  registro MAPA. Defensivos e tratamentos incluídos à mão ficam fora das faixas de IDs do compêndio.
+- Conexões MySQL ociosas fechadas antes de serem reaproveitadas (ECONNRESET no login).
+
 ### 0.0.16
 - Atualizar da API: quando o site do Novo Receituário bloqueia o acesso por alguns minutos (página do
   Cloudflare, HTTP 403/429, normalmente por muitas consultas seguidas), o aviso diz isso e orienta a

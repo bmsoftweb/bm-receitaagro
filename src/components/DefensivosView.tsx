@@ -19,8 +19,11 @@ import { BTN_PRIMARIO, BTN_SECUNDARIO, TABELA, TH, TD, TR, BTN_ACAO, BTN_ACAO_EX
 
 interface Defensivo {
   id: number; nome: string; registroMapa: string; ativo: boolean; idDef: number; idBm: number; idCidasc: number;
-  cidascManual: boolean; tratamentos: number;
+  cidascManual: boolean; situacaoCidasc: string; tratamentos: number;
 }
+
+/** csSituacao do agrotóxico na CIDASC (Tabelas CIDASC); fora de LI a receita bloqueia */
+const SITUACAO_CIDASC: Record<string, string> = { LI: 'Liberado', CA: 'Cancelado', SU: 'Suspenso' };
 
 /** Erro com "x" e fechamento automático (AvisoErro do crmWeb) */
 const Erro: React.FC<{ msg: string | null; onFechar: () => void }> = ({ msg, onFechar }) =>
@@ -373,10 +376,10 @@ export const DefensivosView: React.FC = () => {
         carregar={async (q) => (await get<{ defensivos: Defensivo[] }>(`/api/defensivos${qs({ q })}`)).defensivos}
         descrever={(d) => d.nome}
         barra={<>
-          <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoProgresso('api', 'Atualizando da API do Novo Receituário', '/api/defensivos/atualizar', (r: { defensivos: number; culturas: number; pragas: number; desde: string }) => `Catálogo atualizado${r.desde ? ` (alterações desde ${r.desde.split('-').reverse().join('/')})` : ''}: ${r.defensivos} defensivo(s), ${r.culturas} cultura(s) e ${r.pragas} praga(s).`)} title="Baixar produtos, culturas e pragas do Novo Receituário" className={BTN_SECUNDARIO}>
-            {ocupado === 'api' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Atualizar da API
+          <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoProgresso('api', 'Atualizando o catálogo do compêndio', '/api/defensivos/atualizar', (r: { defensivos: number; culturas: number; pragas: number; desde: string }) => `Catálogo atualizado${r.desde ? ` (alterações desde ${r.desde.split('-').reverse().join('/')})` : ''}: ${r.defensivos} defensivo(s), ${r.culturas} cultura(s) e ${r.pragas} praga(s).`)} title="Atualizar produtos, culturas e pragas do compêndio" className={BTN_SECUNDARIO}>
+            {ocupado === 'api' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Atualizar catálogo
           </button>
-          <button type="button" disabled={Boolean(ocupado)} onClick={() => setConfirmarTodos(true)} title="Baixar as dosagens de todos os defensivos ativos na API do Novo Receituário" className={BTN_SECUNDARIO}>
+          <button type="button" disabled={Boolean(ocupado)} onClick={() => setConfirmarTodos(true)} title="Atualizar as dosagens de todos os defensivos ativos a partir do compêndio" className={BTN_SECUNDARIO}>
             {ocupado === 'todos' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudDownload className="w-3.5 h-3.5" />}Buscar tratamentos
           </button>
           <button type="button" disabled={Boolean(ocupado)} onClick={() => acaoGeral('acertar', '/api/defensivos/acertar-tabelas', () => 'Tabelas acertadas.')} title="Refazer os vínculos entre culturas, pragas e produtos" className={BTN_SECUNDARIO}>
@@ -391,6 +394,12 @@ export const DefensivosView: React.FC = () => {
           { titulo: 'Nome', valor: (d) => <span className={`font-semibold ${d.ativo ? '' : 'line-through text-stone-400'}`}>{d.nome}</span> },
           { titulo: 'Registro MAPA', valor: (d) => d.registroMapa, classe: 'font-mono' },
           { titulo: 'ID CIDASC', valor: (d) => (d.idCidasc ? `${d.idCidasc}${d.cidascManual ? ' (manual)' : ''}` : <span className="text-rose-600">sem vínculo</span>), classe: 'text-right font-mono' },
+          {
+            titulo: 'Situação CIDASC', classe: 'text-center',
+            valor: (d) => !d.situacaoCidasc ? '–' : d.situacaoCidasc === 'LI'
+              ? <span className="text-emerald-700 dark:text-emerald-400">Liberado</span>
+              : <span className="text-rose-600 font-semibold" title="Não pode ser receitado em SC">{SITUACAO_CIDASC[d.situacaoCidasc] || d.situacaoCidasc}</span>,
+          },
           { titulo: 'Produto ERP', valor: (d) => (d.idBm ? d.idBm : '–'), classe: 'text-right font-mono' },
           { titulo: 'Tratamentos', valor: (d) => d.tratamentos, classe: 'text-right font-mono' },
         ]}
@@ -407,8 +416,8 @@ export const DefensivosView: React.FC = () => {
           { icone: Package, titulo: 'Produtos do ERP', descricao: 'associar produtos do BMsoft', semRecarga: true, executar: (def) => setDialogo({ tipo: 'bm', def }) },
           { icone: Link2, titulo: 'Vincular CIDASC', descricao: 'escolher o agrotóxico na tabela da CIDASC', semRecarga: true, executar: (def) => setDialogo({ tipo: 'cidasc', def }) },
           {
-            icone: CloudDownload, titulo: 'Buscar tratamentos', descricao: 'baixar as dosagens na API do Novo Receituário',
-            executar: async (d) => (toast(`Buscando os tratamentos de ${d.nome} na API…`), `Tratamentos de ${d.nome} atualizados (${(await send<{ consultas: number }>('POST', `/api/defensivos/${d.id}/buscar-tratamentos`)).consultas} tratamento(s)).`),
+            icone: CloudDownload, titulo: 'Buscar tratamentos', descricao: 'atualizar as dosagens a partir do compêndio',
+            executar: async (d) => (toast(`Buscando os tratamentos de ${d.nome} no compêndio…`), `Tratamentos de ${d.nome} atualizados (${(await send<{ consultas: number }>('POST', `/api/defensivos/${d.id}/buscar-tratamentos`)).consultas} tratamento(s)).`),
           },
           {
             icone: Eraser, titulo: 'Limpar consulta', descricao: 'a próxima receita consulta a API de novo',
@@ -428,7 +437,7 @@ export const DefensivosView: React.FC = () => {
       {confirmarTodos && (
         <ConfirmModal
           titulo="Buscar tratamentos"
-          mensagem={<>Buscar na API os tratamentos de <strong>todos os defensivos ativos</strong>? São milhares de produtos e pode levar horas; dá para parar a qualquer momento e o que já foi feito fica gravado.</>}
+          mensagem={<>Buscar no compêndio os tratamentos de <strong>todos os defensivos ativos</strong>? São milhares de produtos e pode levar horas; dá para parar a qualquer momento e o que já foi feito fica gravado.</>}
           textoConfirmar="Buscar tratamentos"
           onConfirmar={buscarTodos}
           onCancelar={() => setConfirmarTodos(false)}

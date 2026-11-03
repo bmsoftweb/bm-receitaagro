@@ -94,12 +94,16 @@ interface Escolha {
   tratamento?: Tratamento;
 }
 
-const Lista: React.FC<{ itens: { id: number; titulo: React.ReactNode; detalhe?: React.ReactNode }[]; carregando: boolean; onEscolher: (id: number) => void; selecionado?: number }> = ({ itens, carregando, onEscolher, selecionado }) => (
+/** csSituacao do agrotóxico na CIDASC: fora de LI (liberado) não pode ser receitado */
+const SITUACAO_CIDASC: Record<string, string> = { CA: 'cancelado', SU: 'suspenso' };
+const bloqueadoCidasc = (sit: string) => !!sit && sit !== 'LI';
+
+const Lista: React.FC<{ itens: { id: number; titulo: React.ReactNode; detalhe?: React.ReactNode; bloqueado?: boolean }[]; carregando: boolean; onEscolher: (id: number) => void; selecionado?: number }> = ({ itens, carregando, onEscolher, selecionado }) => (
   <div className="max-h-[50vh] overflow-y-auto divide-y divide-stone-100 dark:divide-stone-800 text-xs border border-stone-200 dark:border-stone-800 rounded-lg">
-    {carregando && <div className="p-3 text-stone-400"><Loader2 className="w-3.5 h-3.5 animate-spin inline" /> Carregando (pode consultar a API do Novo Receituário)…</div>}
+    {carregando && <div className="p-3 text-stone-400"><Loader2 className="w-3.5 h-3.5 animate-spin inline" /> Carregando (pode atualizar o compêndio)…</div>}
     {!carregando && !itens.length && <div className="p-3 text-stone-400">Nada encontrado.</div>}
     {!carregando && itens.map((i) => (
-      <button key={i.id} type="button" onClick={() => onEscolher(i.id)} className={`w-full text-left px-3 py-2 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/30 ${selecionado === i.id ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}>
+      <button key={i.id} type="button" disabled={i.bloqueado} onClick={() => onEscolher(i.id)} className={`w-full text-left px-3 py-2 ${i.bloqueado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/30'} ${selecionado === i.id ? 'bg-amber-50 dark:bg-amber-950/30' : ''}`}>
         <div className="font-semibold text-stone-800 dark:text-stone-100">{i.titulo}</div>
         {i.detalhe && <div className="text-stone-500 mt-0.5">{i.detalhe}</div>}
       </button>
@@ -295,7 +299,9 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
             itens={defensivos.map((d) => ({
               id: d.id,
               titulo: d.nome,
-              detalhe: <>MAPA {d.registroMapa || '–'}{d.idBm ? <> • ERP {d.descricaoBm} • estoque <b className="font-mono">{formatDecimal(d.estoque, 2)} {d.un}</b></> : ' • sem produto no ERP'}{!d.idCidasc && <span className="text-rose-600"> • sem vínculo CIDASC</span>}</>,
+              detalhe: <>MAPA {d.registroMapa || '–'}{d.idBm ? <> • ERP {d.descricaoBm} • estoque <b className="font-mono">{formatDecimal(d.estoque, 2)} {d.un}</b></> : ' • sem produto no ERP'}{!d.idCidasc && <span className="text-rose-600"> • sem vínculo CIDASC</span>}
+                {bloqueadoCidasc(d.situacaoCidasc) && <span className="text-rose-600 font-semibold"> • {SITUACAO_CIDASC[d.situacaoCidasc] || `situação ${d.situacaoCidasc}`} na CIDASC: não pode ser receitado</span>}</>,
+              bloqueado: bloqueadoCidasc(d.situacaoCidasc),
             }))}
           />
         </>
@@ -309,7 +315,7 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
         <>
           {apoio.compendioOnline && (
             <button type="button" disabled={carregando} onClick={() => escolherCultura(esc.cultura!.id, esc.cultura!.nome, esc.produto!.id, true)} className={BTN_SECUNDARIO}>
-              <CloudDownload className="w-3.5 h-3.5" />Atualizar pragas e tratamentos da API
+              <CloudDownload className="w-3.5 h-3.5" />Atualizar pragas e tratamentos
             </button>
           )}
           <Lista carregando={carregando} onEscolher={(id) => escolherPraga(id)} itens={pragas.map((g) => ({ id: g.id, titulo: g.nome, detalhe: <><i>{g.nomeCientifico}</i> • {g.tratamentos} tratamento(s)</> }))} />
@@ -320,7 +326,7 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
         <>
           {apoio.compendioOnline && (
             <button type="button" disabled={carregando} onClick={() => escolherPraga(esc.praga!.id, true)} className={BTN_SECUNDARIO}>
-              <CloudDownload className="w-3.5 h-3.5" />Atualizar tratamento da API
+              <CloudDownload className="w-3.5 h-3.5" />Atualizar tratamento
             </button>
           )}
           <Lista
@@ -329,7 +335,7 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
             itens={tratamentos.map((x) => ({
               id: x.id,
               titulo: <>Dose {formatDecimal(x.doseMinima, 4)} a {formatDecimal(x.doseMaxima, 4)} {x.unidadeAplicacao} • calda {x.volumeCalda || '–'} L/ha • {x.minimoAplicacoes}–{x.maximoAplicacoes} aplicações</>,
-              detalhe: <>{x.localAplicacao} {x.modalidadeAplicacao && `• ${x.modalidadeAplicacao}`} • carência {x.intervaloSeguranca} dias • {x.classificacaoToxicologica} {x.estadosRestritos && <span className="text-rose-600">• restrito em {x.estadosRestritos}</span>}</>,
+              detalhe: <>{x.localAplicacao} {x.modalidadeAplicacao && `• ${x.modalidadeAplicacao}`} • carência {x.intervaloSeguranca} dias • {x.classificacaoToxicologica} {x.estadosRestritos && <span className="text-rose-600">• restrito em {x.estadosRestritos}</span>}{x.naoConferido && <span className="text-amber-600"> • ainda não conferido com a bula</span>}</>,
             }))}
           />
         </>
@@ -340,6 +346,7 @@ const Assistente: React.FC<{ receita: Receita; apoio: Apoio; item: ProdutoLocal 
           <div className="text-[11px] p-2 rounded bg-stone-50 dark:bg-stone-800/60 text-stone-600 dark:text-stone-300">
             Recomendado: dose <b>{formatDecimal(t.doseMinima, 4)} a {formatDecimal(t.doseMaxima, 4)} {t.unidadeAplicacao}</b> • calda {t.volumeCalda || '–'} L/ha
             {t.volumeCaldaAerea ? ` (aérea ${t.volumeCaldaAerea})` : ''} • {t.minimoAplicacoes} a {t.maximoAplicacoes} aplicações • {t.nomeIngredientes}
+            {t.naoConferido && <div className="mt-1 text-amber-700 dark:text-amber-400">Tratamento lido da bula e ainda não conferido pela BMsoft: confira dose e carência na bula.</div>}
           </div>
           <div className="grid grid-cols-4 gap-3">
             <Campo rotulo="Dose" className="col-span-2 sm:col-span-1">

@@ -16,6 +16,8 @@ import {
   Settings,
   ArrowLeftRight,
   Database,
+  ListChecks,
+  ArrowRightLeft,
   type LucideIcon,
 } from 'lucide-react';
 import { Usuario } from '../types';
@@ -33,10 +35,12 @@ export type NavTab =
   | 'clientes'
   | 'configuracoes'
   | 'movimento'
-  | 'tabelasCidasc';
+  | 'tabelasCidasc'
+  | 'compendioBulas'
+  | 'compendioDepara';
 
 export const NAV_TABS: NavTab[] = [
-  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes', 'configuracoes', 'movimento', 'tabelasCidasc',
+  'dashboard', 'receitas', 'defensivos', 'culturas', 'pragas', 'profissionais', 'arts', 'observacoes', 'diagnosticos', 'clientes', 'configuracoes', 'movimento', 'tabelasCidasc', 'compendioBulas', 'compendioDepara',
 ];
 
 export const GRUPOS: { titulo: string; itens: { id: NavTab; label: string; icon: LucideIcon }[] }[] = [
@@ -55,6 +59,8 @@ export const GRUPOS: { titulo: string; itens: { id: NavTab; label: string; icon:
       { id: 'culturas', label: 'Culturas', icon: Sprout },
       { id: 'pragas', label: 'Pragas', icon: Bug },
       { id: 'tabelasCidasc', label: 'Tabelas CIDASC', icon: Database },
+      { id: 'compendioBulas', label: 'Conferência das bulas', icon: ListChecks },
+      { id: 'compendioDepara', label: 'De-para do compêndio', icon: ArrowRightLeft },
     ],
   },
   {
@@ -78,6 +84,8 @@ interface SidebarProps {
   onLogout: () => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+  /** Itens sem acesso (ex.: conferência das bulas, só administradores da BMsoft) */
+  ocultar?: NavTab[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -88,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   isOpenMobile,
   onCloseMobile,
+  ocultar = [],
 }) => {
   const handleNavClick = (tab: NavTab) => {
     onSelectTab(tab);
@@ -126,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">
               {grupo.titulo}
             </div>
-            {grupo.itens.map(({ id, label, icon: Icon }) => {
+            {grupo.itens.filter((it) => !ocultar.includes(it.id)).map(({ id, label, icon: Icon }) => {
               const isActive = activeTab === id;
               return (
                 <button
