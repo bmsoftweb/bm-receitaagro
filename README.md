@@ -54,6 +54,13 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.23
+- bmAPI nova: o bloqueio (403) agora mostra o motivo que a bmAPI devolve, e não mais sempre
+  "somente leitura". O Movimento CIDASC, a ligação de defensivos e a limpeza de duplicados usam
+  tabelas MEMORY, scripts e SELECT ... INTO: precisam do BMapi.exe que libera isso para token com
+  allowWrite e sem TABELAS_LIBERADAS.
+- docs/tabelas-erp-bmapi.pdf: as 41 tabelas do ERP que o app usa pela bmAPI.
+
 ### 0.0.22
 - De-para do compêndio: o Confirmar não aceita mais linha sem correspondência (marcava como conferida
   e escondia a pendência); para essas, usar o Editar e escolher a cultura/praga do catálogo.

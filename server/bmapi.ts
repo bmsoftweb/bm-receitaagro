@@ -16,6 +16,8 @@ import { Servidor } from './servidores.js';
  *  - a bmAPI decide entre Open e ExecSQL pela primeira palavra do comando. Um script
  *    (comandos separados por ";") que começa com SELECT é aberto e devolve as linhas
  *    do ÚLTIMO SELECT, executando os comandos de escrita do meio;
+ *    Script, SELECT ... INTO e "MEMORY\nome" exigem token com allowWrite e sem
+ *    TABELAS_LIBERADAS (a bmAPI barra os três em token restrito);
  *  - parâmetros nomeados (:nome) só valem para o PRIMEIRO comando de um script. Em
  *    scripts, os valores entram como literais montados pelas funções sql* abaixo;
  *  - a comparação de texto é sensível a maiúsculas: buscas usam UPPER(coluna).
@@ -83,7 +85,9 @@ async function postSql(sql: string, params?: Record<string, any>): Promise<any> 
       throw new BmapiError(`A bmAPI recusou o token cadastrado para o servidor ${servidor.numero}.`, 503);
     }
     if (res.status === 403) {
-      throw new BmapiError('A base configurada na bmAPI está somente leitura (allowWrite=false).', 503);
+      // Somente leitura, tabela fora do TABELAS_LIBERADAS, nome com caminho...: a bmAPI diz qual
+      if (process.env.DEBUG_SQL === 'true') console.error('[bmAPI] bloqueado:', msg, '\n', sql);
+      throw new BmapiError(`A bmAPI do servidor ${servidor.numero} bloqueou o comando: ${msg}`, 503);
     }
     if (process.env.DEBUG_SQL === 'true') console.error('[bmAPI] erro:', msg, '\n', sql);
     throw new BmapiError(traduzirErroDbisam(msg), 400);
