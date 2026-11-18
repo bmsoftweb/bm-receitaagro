@@ -247,21 +247,27 @@ export function createCompendioRouter() {
     const ids: number[] = [...new Set<number>((req.body?.ids || []).map((x: unknown) => Math.trunc(Number(x))).filter((x: number) => x > 0))];
     const idDef = await ponte(id);
     if (ids.length) {
+      // Vínculo cujo defensivo não existe mais (B.ID nulo) não conta: sai no script abaixo
       const outro = await consultarUm(
-        `SELECT A.ID_BM id_bm, N.NOME nome FROM REC_DEFENSIVOS_BM A
-           LEFT JOIN REC_DEFENSIVOS B ON B.ID = A.ID_DEF
+        `SELECT A.ID_BM id_bm, A.ID_DEF id_def, B.ID_MAPA mapa, N.NOME nome FROM REC_DEFENSIVOS_BM A
+           INNER JOIN REC_DEFENSIVOS B ON B.ID = A.ID_DEF
            LEFT JOIN REC_NOVOREC_DEFENSIVOS N ON N.ID = B.ID_NOVOREC
           WHERE A.ID_BM IN (${ids.join(',')}) AND A.ID_DEF <> ${sqlInteiro(idDef)} TOP 1`,
       );
       if (outro) {
-        throw new BmapiError(`Produto do BM id ${outro.id_bm} já está associado ao produto: ${String(outro.nome || '').trim()}`);
+        // Defensivo sem produto do compêndio (veio do sistema antigo): identifica pelo id e MAPA
+        const nome = String(outro.nome || '').trim()
+          || `defensivo id ${outro.id_def} sem produto do compêndio${String(outro.mapa || '').trim() ? ` (MAPA ${String(outro.mapa).trim()})` : ''}`;
+        throw new BmapiError(`Produto do BM id ${outro.id_bm} já está associado ao produto: ${nome}`);
       }
     }
+    // O DBISAM não aceita subconsulta no SET do UPDATE: o MAPA vem antes
+    const mapa = (await consultarUm('SELECT REGISTRO_MAPA mapa FROM REC_NOVOREC_DEFENSIVOS WHERE ID = :id', { id }))?.mapa;
     await executarScript([
       `DELETE FROM REC_DEFENSIVOS_BM WHERE ID_DEF = ${sqlInteiro(idDef)}`,
+      ...(ids.length ? [`DELETE FROM REC_DEFENSIVOS_BM WHERE ID_BM IN (${ids.join(',')}) AND ID_DEF NOT IN (SELECT ID FROM REC_DEFENSIVOS)`] : []),
       ...ids.map((b) => `INSERT INTO REC_DEFENSIVOS_BM (ID_BM, ID_DEF) VALUES (${b}, ${sqlInteiro(idDef)})`),
-      `UPDATE REC_DEFENSIVOS SET ID_BM = ${ids.length ? ids[ids.length - 1] : 'NULL'},
-              ID_MAPA = (SELECT REGISTRO_MAPA FROM REC_NOVOREC_DEFENSIVOS WHERE ID = ${sqlInteiro(id)})
+      `UPDATE REC_DEFENSIVOS SET ID_BM = ${ids.length ? ids[ids.length - 1] : 'NULL'}${mapa ? `, ID_MAPA = ${sqlTexto(mapa)}` : ''}
         WHERE ID = ${sqlInteiro(idDef)}`,
     ]);
     res.json({ ok: true });

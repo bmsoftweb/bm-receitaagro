@@ -54,6 +54,13 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.24
+- Produtos do ERP do defensivo: o Salvar dava erro de sintaxe do DBISAM (subconsulta no SET do UPDATE);
+  vínculo de produto com defensivo que não existe mais não bloqueia (é apagado), e o aviso de
+  "já está associado" identifica o defensivo sem produto do compêndio pelo id e MAPA.
+- Nova receita: ao escolher o cliente, latitude/longitude/altitude passam a ser sempre as da última
+  receita dele (ou ficam zeradas), como no receituário Delphi; antes só preenchia se estivessem vazias.
+
 ### 0.0.23
 - bmAPI nova: o bloqueio (403) agora mostra o motivo que a bmAPI devolve, e não mais sempre
   "somente leitura". O Movimento CIDASC, a ligação de defensivos e a limpeza de duplicados usam

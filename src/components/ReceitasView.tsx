@@ -523,7 +523,9 @@ const ReceitaForm: React.FC<{ apoio: Apoio; idInicial: number; clonarDe?: number
       setR((x) => ({
         ...x, idCliente: c.id, cliente: c.nome, localAplicacao: x.localAplicacao || c.localAplicacao,
         idLocalidade: c.idLocalidade || (c.localidades.length === 1 ? c.localidades[0].id : 0), idTipoLogradouro: c.idTipoLogradouro,
-        ...(c.ultimaGeo && !x.latitude ? c.ultimaGeo : {}),
+        // Receita nova (igual ao Delphi): troca pelas coordenadas da última receita deste cliente, ou limpa.
+        // Na alteração, só preenche se estiver vazio.
+        ...(!x.id ? (c.ultimaGeo || { altitude: 0, latitude: 0, longitude: 0 }) : c.ultimaGeo && !x.latitude ? c.ultimaGeo : {}),
       }));
     } catch (e: any) {
       setErro(e.message);
