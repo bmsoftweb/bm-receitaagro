@@ -100,11 +100,12 @@ html, body {
   color: var(--color-stone-100);
 }
 
-/* Impressão da receita: só a área da receita vai para o papel */
+/* Impressão da receita: só a área da receita vai para o papel.
+   display:none (não visibility) para o app por trás não ocupar altura e gerar folha em branco;
+   a área vem por portal direto no body */
 @media print {
-  body * { visibility: hidden; }
-  .area-impressao, .area-impressao * { visibility: visible; }
-  .area-impressao { position: absolute; left: 0; top: 0; width: 100%; }
+  body:has(> .area-impressao) > *:not(.area-impressao) { display: none !important; }
+  .area-impressao { position: static !important; }
 }
 
 /* Barra de progresso sem total (ProgressoModal) */

@@ -54,6 +54,9 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.26
+- Impressão da receita não sai mais com uma folha em branco a mais: o app por trás deixava de aparecer, mas ainda ocupava altura no papel.
+
 ### 0.0.25
 - Dicas (tooltips) no padrão BMsoft em todo o app: caixa escura com seta no lugar da dica nativa do navegador.
 - A receita em digitação não se perde ao trocar de aba.

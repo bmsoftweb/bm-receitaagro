@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus, Pencil, Trash2, Printer, RefreshCw, Loader2, Save, ChevronRight, Lock, Inbox, MapPin,
   Mountain, ArrowLeft, ArrowRight, Check, CloudDownload, ExternalLink, Send, Ban, Copy, ClipboardPaste, AlertTriangle,
@@ -917,7 +918,7 @@ const Impressao: React.FC<{ id: number; onFechar: (imprimiu: boolean) => void }>
   }
   const { receita: r, produtos, profissional: p, cliente: c, empresa: e } = d;
   const L = 'text-[9px] uppercase text-stone-500';
-  return (
+  return createPortal(
     <div className="area-impressao fixed inset-0 z-[70] bg-white text-black overflow-auto print:static print:overflow-visible">
       <div className="print:hidden sticky top-0 bg-stone-100 border-b p-2 flex gap-2 justify-end">
         <button type="button" onClick={() => onFechar(false)} className={BTN_SECUNDARIO}>Fechar</button>
@@ -966,7 +967,8 @@ const Impressao: React.FC<{ id: number; onFechar: (imprimiu: boolean) => void }>
         {/* ponytail: sem QR code nem PDF/FTP; a chave fica impressa para conferência */}
         <div className="text-[9px] text-stone-500 text-center">Chave {r.chavePdf}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
