@@ -54,6 +54,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.25
+- Dicas (tooltips) no padrão BMsoft em todo o app: caixa escura com seta no lugar da dica nativa do navegador.
+- A receita em digitação não se perde ao trocar de aba.
+
 ### 0.0.24
 - Produtos do ERP do defensivo: o Salvar dava erro de sintaxe do DBISAM (subconsulta no SET do UPDATE);
   vínculo de produto com defensivo que não existe mais não bloqueia (é apagado), e o aviso de

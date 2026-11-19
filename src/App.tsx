@@ -32,6 +32,9 @@ export const App: React.FC = () => {
   const [dbStatus, setDbStatus] = useState<DbConnectionStatus | null>(null);
   const [meusDadosAberto, setMeusDadosAberto] = useState(false);
   const [conferente, setConferente] = useState(false);
+  // Receitas fica montada depois da 1ª visita: a receita em digitação sobrevive à ida a Defensivos etc.
+  const [receitasAberta, setReceitasAberta] = useState(false);
+  useEffect(() => { if (activeTab === 'receitas') setReceitasAberta(true); }, [activeTab]);
 
   // Inicializa token da API
   useEffect(() => {
@@ -183,7 +186,9 @@ export const App: React.FC = () => {
           </main>
         ) : (
           <main className="flex-1 flex flex-col min-h-0 w-full print:block">
-            {activeTab === 'receitas' && <ReceitasView />}
+            {(receitasAberta || activeTab === 'receitas') && (
+              <div className={activeTab === 'receitas' ? 'contents' : 'hidden'}><ReceitasView /></div>
+            )}
             {activeTab === 'defensivos' && <DefensivosView />}
             {activeTab === 'culturas' && <CulturasView />}
             {activeTab === 'pragas' && <PragasView />}
