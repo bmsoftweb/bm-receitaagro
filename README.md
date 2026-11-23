@@ -54,6 +54,10 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.27
+- Corrigido o erro "Duplicate key ... REC_NOVOREC_DEFENSIVOS" ao incluir produto na receita e no Atualizar catálogo:
+  produto do compêndio que mudou de registro MAPA (ou teve o MAPA trocado no vínculo CIDASC) não é mais inserido de novo.
+
 ### 0.0.26
 - Impressão da receita não sai mais com uma folha em branco a mais: o app por trás deixava de aparecer, mas ainda ocupava altura no papel.
 

@@ -239,8 +239,10 @@ export async function sincronizarCultura(idCultura: number) {
       WHERE dc.cultura_id = ? AND p.ativo = 1`,
     [idCultura],
   );
+  const todos = await defensivosLocais();
+  const jaTem = new Set(todos.map((d) => d.id));
   const porMapa = new Map<string, number[]>();
-  for (const d of await defensivosLocais()) if (d.mapa) porMapa.set(d.mapa, [...(porMapa.get(d.mapa) || []), d.id]);
+  for (const d of todos) if (d.mapa) porMapa.set(d.mapa, [...(porMapa.get(d.mapa) || []), d.id]);
 
   const novos: string[] = [];
   const ids: number[] = [];
@@ -249,6 +251,8 @@ export async function sincronizarCultura(idCultura: number) {
     if (locais) { ids.push(...locais); continue; }
     const id = ID_PRODUTO_PROPRIO + Number(pr.id);
     ids.push(id);
+    // Já criado com outro MAPA (bula relida ou MAPA trocado no vínculo CIDASC): reaproveita, sem duplicar a chave
+    if (jaTem.has(id)) continue;
     novos.push(`INSERT INTO REC_NOVOREC_DEFENSIVOS (ID, NOME, REGISTRO_MAPA, ATIVO) VALUES (${id}, ${sqlTexto(semAcento(pr.marca).toUpperCase(), 80)}, ${sqlTexto(pr.registro_mapa, 15)}, ${sqlBool(true)})`);
   }
   const c = sqlInteiro(idCultura);
@@ -266,8 +270,10 @@ export async function sincronizarCultura(idCultura: number) {
 export async function atualizarCatalogoProprio(progresso: Progresso = () => {}) {
   progresso('Lendo os produtos do compêndio');
   const [produtos] = await pool.query<any[]>('SELECT id, registro_mapa, marca FROM compendio_produtos WHERE ativo = 1');
-  const locais = new Set((await defensivosLocais()).map((d) => d.mapa).filter(Boolean));
-  const novos = produtos.filter((pr) => !locais.has(mapaLimpo(pr.registro_mapa)));
+  const todos = await defensivosLocais();
+  const locais = new Set(todos.map((d) => d.mapa).filter(Boolean));
+  const jaTem = new Set(todos.map((d) => d.id));
+  const novos = produtos.filter((pr) => !locais.has(mapaLimpo(pr.registro_mapa)) && !jaTem.has(ID_PRODUTO_PROPRIO + Number(pr.id)));
   await executarScript(novos.map((pr) => `INSERT INTO REC_NOVOREC_DEFENSIVOS (ID, NOME, REGISTRO_MAPA, ATIVO)
     VALUES (${ID_PRODUTO_PROPRIO + Number(pr.id)}, ${sqlTexto(semAcento(pr.marca).toUpperCase(), 80)}, ${sqlTexto(pr.registro_mapa, 15)}, ${sqlBool(true)})`),
   (f, t) => progresso('Gravando os defensivos', f, t));
