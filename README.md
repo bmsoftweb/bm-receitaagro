@@ -54,6 +54,12 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.28
+- Movimento CIDASC: botão Completar, que inclui no movimento aberto os lançamentos do período dele ainda fora
+  de movimento (ex.: itens excluídos), sem precisar gravar um movimento novo.
+- Gerar movimento não descarta mais o lançamento cujo produto do ERP não é o gravado no defensivo (várias
+  embalagens no mesmo defensivo); com o produto ligado a mais de um defensivo, sai uma linha só por lançamento.
+
 ### 0.0.27
 - Corrigido o erro "Duplicate key ... REC_NOVOREC_DEFENSIVOS" ao incluir produto na receita e no Atualizar catálogo:
   produto do compêndio que mudou de registro MAPA (ou teve o MAPA trocado no vínculo CIDASC) não é mais inserido de novo.

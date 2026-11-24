@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Ban, ChevronRight, Inbox, Loader2, Plus, RefreshCw, Save, Search, Send, Trash2, FolderOpen } from 'lucide-react';
+import { Ban, ChevronRight, Inbox, ListPlus, Loader2, Plus, RefreshCw, Save, Search, Send, Trash2, FolderOpen } from 'lucide-react';
 import { get, send } from '../services/api';
 import { formatDateBR, formatDoc, formatQtd, hojeISO } from '../utils/formatters';
 import { INPUT_CLASS, FIELD_WRAPPER_CLASS } from '../utils/formStyles';
@@ -138,7 +138,7 @@ const Movimento: React.FC<{ id: number; sigenProducao: boolean | null; onMudou: 
   const [carregando, setCarregando] = useState(true);
   const [pendentes, setPendentes] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [acao, setAcao] = useState<{ tipo: 'enviar' | 'cancelar' | 'excluir'; item?: Item } | null>(null);
+  const [acao, setAcao] = useState<{ tipo: 'enviar' | 'cancelar' | 'excluir' | 'completar'; item?: Item } | null>(null);
   const [processando, setProcessando] = useState(false);
 
   const carregar = () => {
@@ -155,7 +155,10 @@ const Movimento: React.FC<{ id: number; sigenProducao: boolean | null; onMudou: 
     setProcessando(true); setErro(null);
     let falha: string | null = null;
     try {
-      if (acao.tipo === 'excluir') {
+      if (acao.tipo === 'completar') {
+        const r = await send<{ itens: number }>('POST', `/api/movimentos/${id}/completar`);
+        toast(r.itens ? `${r.itens} item(ns) incluído(s) no movimento.` : 'Nenhum lançamento livre no período do movimento.');
+      } else if (acao.tipo === 'excluir') {
         const r = await send<{ excluidos: number; restantes: number }>('DELETE', `/api/movimentos/${id}`);
         toast(`${r.excluidos} item(ns) excluído(s).`);
         setAcao(null);
@@ -189,6 +192,7 @@ const Movimento: React.FC<{ id: number; sigenProducao: boolean | null; onMudou: 
         <div className="flex items-center gap-2.5 shrink-0">
           <Toggle checked={pendentes} onChange={setPendentes} label={<span className="text-xs text-stone-600 dark:text-stone-300">Só não enviados</span>} />
           <button type="button" onClick={carregar} disabled={carregando} title="Recarregar" className={BTN_SECUNDARIO}><RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin' : ''}`} /></button>
+          <button type="button" onClick={() => setAcao({ tipo: 'completar' })} disabled={carregando} title="Incluir os lançamentos do período ainda fora de movimento (ex.: itens excluídos)" className={BTN_SECUNDARIO}><ListPlus className="w-3.5 h-3.5" /><span>Completar</span></button>
           <button type="button" onClick={() => setAcao({ tipo: 'excluir' })} disabled={!aEnviar.length} className={BTN_SECUNDARIO}><Trash2 className="w-3.5 h-3.5" /><span>Excluir não enviados</span></button>
           <button type="button" onClick={() => setAcao({ tipo: 'cancelar' })} disabled={!enviados.length} className={BTN_SECUNDARIO}><Ban className="w-3.5 h-3.5" /><span>Cancelar todos</span></button>
           <button type="button" onClick={() => setAcao({ tipo: 'enviar' })} disabled={!aEnviar.length} className={BTN_PRIMARIO}><Send className="w-3.5 h-3.5" /><span>Enviar todos</span></button>
@@ -205,16 +209,18 @@ const Movimento: React.FC<{ id: number; sigenProducao: boolean | null; onMudou: 
       />
       {acao && (
         <ConfirmModal
-          titulo={acao.tipo === 'excluir' ? 'Excluir itens não enviados' : acao.tipo === 'cancelar' ? 'Cancelar na CIDASC' : 'Enviar à CIDASC'}
-          subtitulo={acao.tipo === 'excluir' || sigenProducao === null ? undefined : sigenProducao ? 'Ambiente: PRODUÇÃO' : 'Ambiente: homologação (testes)'}
-          mensagem={acao.tipo === 'excluir'
+          titulo={acao.tipo === 'completar' ? 'Completar movimento' : acao.tipo === 'excluir' ? 'Excluir itens não enviados' : acao.tipo === 'cancelar' ? 'Cancelar na CIDASC' : 'Enviar à CIDASC'}
+          subtitulo={acao.tipo === 'excluir' || acao.tipo === 'completar' || sigenProducao === null ? undefined : sigenProducao ? 'Ambiente: PRODUÇÃO' : 'Ambiente: homologação (testes)'}
+          mensagem={acao.tipo === 'completar'
+            ? <>Incluir neste movimento os lançamentos do período dele que ainda não estão em nenhum movimento (por exemplo, itens excluídos)?</>
+            : acao.tipo === 'excluir'
             ? <>Excluir os <strong>{aEnviar.length}</strong> item(ns) ainda não enviados? Eles voltam a aparecer ao gerar um novo movimento do período.{!enviados.length && ' O movimento fica vazio e também é excluído.'}</>
             : acao.tipo === 'cancelar'
               ? <>Cancelar no SIGEN {qual || <><strong>todos os {enviados.length}</strong> item(ns) enviados</>}?</>
               : <>Enviar ao SIGEN da CIDASC {qual || <><strong>todos os {aEnviar.length}</strong> item(ns) não enviados</>}?</>}
-          textoConfirmar={acao.tipo === 'excluir' ? 'Excluir' : acao.tipo === 'cancelar' ? 'Cancelar na CIDASC' : 'Enviar'}
-          neutro={acao.tipo === 'enviar'}
-          icone={acao.tipo === 'excluir' ? Trash2 : acao.tipo === 'cancelar' ? Ban : Send}
+          textoConfirmar={acao.tipo === 'completar' ? 'Completar' : acao.tipo === 'excluir' ? 'Excluir' : acao.tipo === 'cancelar' ? 'Cancelar na CIDASC' : 'Enviar'}
+          neutro={acao.tipo === 'enviar' || acao.tipo === 'completar'}
+          icone={acao.tipo === 'completar' ? ListPlus : acao.tipo === 'excluir' ? Trash2 : acao.tipo === 'cancelar' ? Ban : Send}
           processando={processando}
           onConfirmar={confirmar}
           onCancelar={() => setAcao(null)}

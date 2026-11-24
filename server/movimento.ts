@@ -56,7 +56,7 @@ async function gerar(d1: string, d2: string) {
     }
     await executar(`DROP TABLE IF EXISTS ${x1}`);
 
-    return await consultar(`${cardex};
+    const linhas = await consultar(`${cardex};
 
       /* VENDAS */
       SELECT A.ID ID_PROLOTESCARDEX, A.ID_LOTE ID_LOTE, E.CIDASC,
@@ -72,14 +72,14 @@ async function gerar(d1: string, d2: string) {
              N.CLIENTE_NOME NOME_PESSOA, PP.COD_CIDADE, A.DATA DATA_EMISSAO, '' JUSTIFICATIVA, L.LOTE, A.ID_PRO ID_BM,
              IF(D.ID_CIDASC=NULL,CAST(P.COD_INTEGRACAO AS INTEGER),D.ID_CIDASC) ID_CIDASC_DEF,
              P.DESCRICAO DESCRICAO_PRODUTO, P.UNVENDA, M.idAgrotoxicoMedida ID_CIDASC_UN, A.NUMERO_ART,
-             R.NUMERO_RECEITA_FULL NUMERO_RECEITA, A.QTD
+             R.NUMERO_RECEITA_FULL NUMERO_RECEITA, A.QTD, D.ID_BM DEF_BM
         INTO ${x2}
         FROM ${x1} A
         LEFT JOIN NFMESTRE N ON N.ID = A.ID_VENDA
         LEFT JOIN EMPRESAS E ON E.ID = A.ID_EMPRESA
         LEFT JOIN PROLOTES L ON L.ID = A.ID_LOTE
         LEFT JOIN REC_DEFENSIVOS_BM B ON B.ID_BM = A.ID_PRO
-        LEFT JOIN REC_DEFENSIVOS D ON ((D.ID = B.ID_DEF) and (d.id_bm = a.id_pro))
+        LEFT JOIN REC_DEFENSIVOS D ON D.ID = B.ID_DEF
         LEFT JOIN PRODUTOSPRINCIPAL P ON P.ID = A.ID_PRO
         LEFT JOIN REC_RECEITAS R ON R.ID = A.ID_RECEITA
         LEFT JOIN REC_UN_MEDIDAS_CIDASC M ON M.ID = P.ID_EMBALAGEM
@@ -94,14 +94,14 @@ async function gerar(d1: string, d2: string) {
              F.NOME NOME_PESSOA, F.COD_CIDADE, A.DATA DATA_EMISSAO, '' JUSTIFICATIVA, L.LOTE, A.ID_PRO ID_BM,
              IF(D.ID_CIDASC=NULL,CAST(P.COD_INTEGRACAO AS INTEGER),D.ID_CIDASC) ID_CIDASC_DEF,
              P.DESCRICAO DESCRICAO_PRODUTO, P.UNVENDA, M.idAgrotoxicoMedida ID_CIDASC_UN, '' NUMERO_ART,
-             '' NUMERO_RECEITA, A.QTD
+             '' NUMERO_RECEITA, A.QTD, D.ID_BM DEF_BM
         FROM ${x1} A
         LEFT JOIN ENTRADASM N ON N.ID = A.ID_COMPRA
         LEFT JOIN EMPRESAS E ON E.ID = A.ID_EMPRESA
         LEFT JOIN PESSOAS F ON F.ID = N.ID_FORNEC
         LEFT JOIN PROLOTES L ON L.ID = A.ID_LOTE
         LEFT JOIN REC_DEFENSIVOS_BM B ON B.ID_BM = A.ID_PRO
-        LEFT JOIN REC_DEFENSIVOS D ON ((D.ID = B.ID_DEF) and (d.id_bm = a.id_pro))
+        LEFT JOIN REC_DEFENSIVOS D ON D.ID = B.ID_DEF
         LEFT JOIN PRODUTOSPRINCIPAL P ON P.ID = A.ID_PRO
         LEFT JOIN REC_UN_MEDIDAS_CIDASC M ON M.ID = P.ID_EMBALAGEM
        WHERE (ID_COMPRA<>NULL) AND (P.RECEITA='S') AND (D.ID_CIDASC<>NULL);
@@ -116,6 +116,15 @@ async function gerar(d1: string, d2: string) {
        WHERE (SERIE_DE<>NULL) AND (NUMERO_DE<>NULL) AND (TIPO_OPERACAO = 'DE');
 
       SELECT * FROM ${x3} ORDER BY DESCRICAO_PRODUTO, DATA_EMISSAO, NATUREZA_OPERACAO`);
+    // Produto do ERP ligado a mais de um defensivo: uma linha por lançamento, de preferência a do
+    // defensivo que tem o próprio produto gravado (o filtro D.ID_BM = A.ID_PRO barrava os demais)
+    const porCardex = new Map<number, any>();
+    for (const r of linhas) {
+      const k = n(r.id_prolotescardex);
+      const atual = porCardex.get(k);
+      if (!atual || (n(atual.def_bm) !== n(atual.id_bm) && n(r.def_bm) === n(r.id_bm))) porCardex.set(k, r);
+    }
+    return linhas.filter((r) => porCardex.get(n(r.id_prolotescardex)) === r);
   } finally {
     await soltar();
   }
@@ -208,6 +217,27 @@ function corpoSigen(r: any) {
   };
 }
 
+/** Grava os itens no movimento e marca o cardex (e a NF de compra) com 'E' */
+async function gravarItens(idMov: number, linhas: any[]) {
+  const comandos: string[] = [];
+  for (const r of linhas) {
+    comandos.push(
+      `INSERT INTO REC_CIDASC_MOV (ID_MOV, ID_PROLOTESCARDEX, COD_EMPRESA_CIDASC, TIPO_OPERACAO, NATUREZA_OPERACAO, SERIE, NUMERO,
+         NUMERO_DOC, NOME_PESSOA, COD_MUNICIPIO_IBGE, DATA_EMISSAO, JUSTIFICATIVA, LOTE, ID_PRO, ID_CIDASC_DEF, DESCRICAO_PRODUTO,
+         UN_VENDA, ID_CIDASC_UN, NUMERO_ART, NUMERO_RECEITA, QTD)
+       VALUES (${idMov}, ${sqlInteiro(r.id_prolotescardex)}, ${sqlTexto(s(r.cidasc), 5)}, ${sqlTexto(s(r.tipo_operacao), 2)},
+         ${sqlTexto(s(r.natureza_operacao), 1)}, ${sqlTexto(s(r.serie), 3)}, ${sqlInteiro(n(r.numero))}, ${sqlTexto(s(r.cliente_doc), 20)},
+         ${sqlTexto(s(r.nome_pessoa), 50)}, ${sqlTexto(s(r.cod_cidade), 7)}, ${sqlData(r.data_emissao)}, ${sqlTexto(s(r.justificativa), 512)},
+         ${sqlTexto(s(r.lote), 20)}, ${sqlInteiro(r.id_bm)}, ${sqlInteiro(n(r.id_cidasc_def))}, ${sqlTexto(s(r.descricao_produto), 80)},
+         ${sqlTexto(s(r.unvenda), 6)}, ${sqlInteiro(n(r.id_cidasc_un))}, ${sqlTexto(s(r.numero_art), 15)}, ${sqlTexto(s(r.numero_receita), 15)},
+         ${sqlNumero(n(r.qtd))})`,
+      `UPDATE PROLOTESCARDEX SET STATUS_ENVIO = 'E' WHERE ID = ${sqlInteiro(r.id_prolotescardex)}`,
+    );
+    if (s(r.tipo_operacao) === 'CO') comandos.push(statusCompra(r, 'E'));
+  }
+  await executarScript(comandos);
+}
+
 export function createMovimentoRouter() {
   const router = Router();
 
@@ -267,24 +297,20 @@ export function createMovimentoRouter() {
     const idMov = n(mestre?.id);
     if (!idMov) throw new BmapiError('Falha ao gravar o movimento.');
 
-    const comandos: string[] = [];
-    for (const r of linhas) {
-      comandos.push(
-        `INSERT INTO REC_CIDASC_MOV (ID_MOV, ID_PROLOTESCARDEX, COD_EMPRESA_CIDASC, TIPO_OPERACAO, NATUREZA_OPERACAO, SERIE, NUMERO,
-           NUMERO_DOC, NOME_PESSOA, COD_MUNICIPIO_IBGE, DATA_EMISSAO, JUSTIFICATIVA, LOTE, ID_PRO, ID_CIDASC_DEF, DESCRICAO_PRODUTO,
-           UN_VENDA, ID_CIDASC_UN, NUMERO_ART, NUMERO_RECEITA, QTD)
-         VALUES (${idMov}, ${sqlInteiro(r.id_prolotescardex)}, ${sqlTexto(s(r.cidasc), 5)}, ${sqlTexto(s(r.tipo_operacao), 2)},
-           ${sqlTexto(s(r.natureza_operacao), 1)}, ${sqlTexto(s(r.serie), 3)}, ${sqlInteiro(n(r.numero))}, ${sqlTexto(s(r.cliente_doc), 20)},
-           ${sqlTexto(s(r.nome_pessoa), 50)}, ${sqlTexto(s(r.cod_cidade), 7)}, ${sqlData(r.data_emissao)}, ${sqlTexto(s(r.justificativa), 512)},
-           ${sqlTexto(s(r.lote), 20)}, ${sqlInteiro(r.id_bm)}, ${sqlInteiro(n(r.id_cidasc_def))}, ${sqlTexto(s(r.descricao_produto), 80)},
-           ${sqlTexto(s(r.unvenda), 6)}, ${sqlInteiro(n(r.id_cidasc_un))}, ${sqlTexto(s(r.numero_art), 15)}, ${sqlTexto(s(r.numero_receita), 15)},
-           ${sqlNumero(n(r.qtd))})`,
-        `UPDATE PROLOTESCARDEX SET STATUS_ENVIO = 'E' WHERE ID = ${sqlInteiro(r.id_prolotescardex)}`,
-      );
-      if (s(r.tipo_operacao) === 'CO') comandos.push(statusCompra(r, 'E'));
-    }
-    await executarScript(comandos);
+    await gravarItens(idMov, linhas);
     res.json({ id: idMov, itens: linhas.length });
+  }));
+
+  /** Completar: inclui no movimento os lançamentos do período dele que ainda estão livres (ex.: itens excluídos) */
+  router.post('/movimentos/:id/completar', rota(async (req, res) => {
+    const idMov = idParam(req);
+    const m = await consultarUm('SELECT DATA_INICIAL d1, DATA_FINAL d2 FROM REC_CIDASC_MOV_MESTRE WHERE ID = :id', { id: idMov });
+    if (!m) throw new BmapiError('Movimento não encontrado.', 404);
+    const [d1, d2] = [s(m.d1).slice(0, 10), s(m.d2).slice(0, 10)];
+    if (!d1 || !d2) throw new BmapiError('Movimento sem período gravado (gerado no sistema antigo): gere um movimento novo.');
+    const linhas = await gerar(d1, d2);
+    await gravarItens(idMov, linhas);
+    res.json({ itens: linhas.length });
   }));
 
   /**
