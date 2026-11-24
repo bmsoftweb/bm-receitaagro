@@ -54,6 +54,11 @@ Regras de cálculo (dose, quantidade, área, numeração, chave do PDF) ficam em
 
 ## Histórico
 
+### 0.0.29
+- Carga do compêndio: produto sem bula no AGROFIT procura a bula pelo nome nas listas da ADAPAR (fase `adapar`,
+  também na atualização completa); a fase `produtos` não apaga mais esse endereço.
+- Extração confere o registro MAPA impresso na bula e recusa a bula de outro registro.
+
 ### 0.0.28
 - Movimento CIDASC: botão Completar, que inclui no movimento aberto os lançamentos do período dele ainda fora
   de movimento (ex.: itens excluídos), sem precisar gravar um movimento novo.

@@ -1,6 +1,6 @@
 /**
  * Atualização completa do compêndio central, em sequência (o que antes se rodava à mão):
- *   produtos (AGROFIT) -> bulas novas/alteradas -> extrair tratamentos -> textos (EPI, precauções) -> de-para.
+ *   produtos (AGROFIT) -> bulas da ADAPAR (sem bula no AGROFIT) -> bulas novas/alteradas -> extrair tratamentos -> textos (EPI, precauções) -> de-para.
  * Cada etapa roda mesmo se a anterior falhar; o log fica em scripts/logs/compendio_AAAAMMDD_HHMM.log.
  * Duplo clique: scripts/Atualizar compendio.cmd (ou agendado no Agendador de Tarefas do Windows).
  *
@@ -13,6 +13,7 @@ import { agoraISO } from '../server/bmapi.js';
 
 const ETAPAS: [string, string[]][] = [
   ['Produtos do AGROFIT', ['scripts/carga-compendio.ts', 'produtos']],
+  ['Bulas da ADAPAR (sem bula no AGROFIT)', ['scripts/carga-compendio.ts', 'adapar']],
   ['Bulas novas ou alteradas', ['scripts/carga-compendio.ts', 'bulas']],
   ['Tratamentos das bulas pendentes', ['scripts/carga-compendio.ts', 'extrair']],
   ['EPI, precauções, local e antídoto', ['scripts/carga-compendio.ts', 'textos']],

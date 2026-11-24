@@ -3,6 +3,7 @@
  * Roda local (não na Vercel). Chaves no .env: AGROAPI_*, ANTHROPIC_API_KEY.
  *
  *   npx tsx scripts/carga-compendio.ts produtos              lista do AGROFIT -> compendio_produtos
+ *   npx tsx scripts/carga-compendio.ts adapar [0] [reg]      sem bula no AGROFIT: procura pelo nome nas listas da ADAPAR (PR)
  *   npx tsx scripts/carga-compendio.ts bulas [limite] [reg]  baixa as bulas novas/alteradas -> compendio_bulas
  *   npx tsx scripts/carga-compendio.ts extrair [limite] [reg] envia as bulas pendentes à Claude (Batches) e grava;
  *     a bula que vier com menos de 80% dos pares cultura × praga do AGROFIT é refeita com o Opus
@@ -85,6 +86,7 @@ function bulaRecente(p: any) {
     .pop();
 }
 
+/** AGROFIT sem bula: mantém a bula achada antes (fase adapar); a do AGROFIT, quando vier, passa a valer */
 async function gravarProduto(p: any) {
   const reg = String(p.numero_registro || '').replace(/\D/g, '').replace(/^0+/, '');
   if (!reg) return null;
@@ -96,9 +98,10 @@ async function gravarProduto(p: any) {
      ON DUPLICATE KEY UPDATE marca = VALUES(marca), titular = VALUES(titular), formulacao = VALUES(formulacao),
        ingrediente_ativo = VALUES(ingrediente_ativo), classe = VALUES(classe), classe_toxicologica = VALUES(classe_toxicologica),
        classe_ambiental = VALUES(classe_ambiental),
-       hash_bula = IF(url_bula_origem <=> VALUES(url_bula_origem), hash_bula, NULL),
-       status_extracao = IF(VALUES(url_bula_origem) IS NULL, 'sem_bula', IF(status_extracao = 'sem_bula', 'pendente', status_extracao)),
-       url_bula_origem = VALUES(url_bula_origem), data_bula = VALUES(data_bula), ativo = 1`,
+       hash_bula = IF(VALUES(url_bula_origem) IS NULL OR url_bula_origem <=> VALUES(url_bula_origem), hash_bula, NULL),
+       status_extracao = IF(COALESCE(VALUES(url_bula_origem), url_bula_origem) IS NULL, 'sem_bula', IF(status_extracao = 'sem_bula', 'pendente', status_extracao)),
+       data_bula = IF(VALUES(url_bula_origem) IS NULL, data_bula, VALUES(data_bula)),
+       url_bula_origem = COALESCE(VALUES(url_bula_origem), url_bula_origem), ativo = 1`,
     [reg, corta(lista(p.marca_comercial), 150) || reg, corta(p.titular_registro, 200), corta(p.formulacao, 100),
       corta(lista(p.ingrediente_ativo), 500), corta(lista(p.classe_categoria_agronomica), 150),
       corta(p.classificacao_toxicologica, 150), corta(p.classificacao_ambiental, 150),
@@ -166,6 +169,42 @@ async function bulas() {
       console.log(`${p.registro_mapa} ${p.marca}: ERRO ${e.message}`);
     }
   }
+}
+
+// ---------------- Bulas da ADAPAR (produto sem bula no AGROFIT) ----------------
+const ADAPAR = 'https://www.adapar.pr.gov.br';
+const PAGINAS_ADAPAR = ['Agrotoxicos-Inseticidas', 'Agrotoxicos-Herbicidas', 'Agrotoxicos-Fungicidas', 'Agrotoxicos-Outros'];
+const nomeChave = (s: unknown) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/**
+ * Procura pelo nome comercial a bula nas listas da ADAPAR (só os produtos do PR). O nome pode
+ * repetir entre registros: o extrair confere o registro impresso na bula e recusa a de outro.
+ */
+async function adapar() {
+  const links = new Map<string, string>(); // nome -> PDF mais recente (a pasta do arquivo é AAAA-MM)
+  for (const pagina of PAGINAS_ADAPAR) {
+    const r = await fetch(`${ADAPAR}/Pagina/${pagina}`);
+    if (!r.ok) throw new Error(`ADAPAR ${pagina}: HTTP ${r.status}`);
+    const html = await r.text();
+    for (const [, href, texto] of html.matchAll(/<a[^>]+href="([^"]+\.pdf)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const nome = nomeChave(texto.replace(/<[^>]+>/g, ''));
+      const url = new URL(href, ADAPAR).toString();
+      if (nome && (!links.has(nome) || url > links.get(nome)!)) links.set(nome, url);
+    }
+  }
+  console.log(`${links.size} bulas nas listas da ADAPAR`);
+  const [linhas]: any = await sql(
+    `SELECT id, registro_mapa, marca FROM compendio_produtos WHERE ativo = 1 AND url_bula_origem IS NULL${filtro()} ORDER BY id`,
+    registros,
+  );
+  let achados = 0;
+  for (const p of linhas) {
+    const url = String(p.marca).split(';').map((m) => links.get(nomeChave(m))).find(Boolean);
+    if (!url) continue;
+    await sql(`UPDATE compendio_produtos SET url_bula_origem = ?, hash_bula = NULL, status_extracao = 'pendente', erro_extracao = NULL WHERE id = ?`, [url, p.id]);
+    console.log(`${++achados}. ${p.registro_mapa} ${p.marca}: ${url}`);
+  }
+  console.log(`${achados} de ${linhas.length} produtos sem bula achados na ADAPAR (rode bulas e extrair)`);
 }
 
 // ---------------- Extração com a Claude (Message Batches) ----------------
@@ -336,6 +375,10 @@ async function gravarTextos(produtoId: number, d: any) {
 }
 
 async function gravarTratamentos(produtoId: number, dados: any, modelo: string) {
+  // Bula de outro registro (achada pelo nome, ex.: ADAPAR): não grava nada dela
+  const [[prod]]: any = await sql('SELECT registro_mapa FROM compendio_produtos WHERE id = ?', [produtoId]);
+  const naBula = String(dados.registro_na_bula ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  if (naBula && prod && naBula !== String(prod.registro_mapa).replace(/^0+/, '')) throw new Error(`a bula é do registro ${naBula}, não do ${prod.registro_mapa}`);
   const t = expandir(dados);
   const agro = await paresAgrofit(produtoId);
   const baixa = agro > 0 && t.length < agro * COBERTURA_MIN;
@@ -380,11 +423,12 @@ async function gravarTratamentos(produtoId: number, dados: any, modelo: string) 
 
 try {
   if (cmd === 'produtos') await produtos();
+  else if (cmd === 'adapar') await adapar();
   else if (cmd === 'bulas') await bulas();
   else if (cmd === 'extrair') await extrair();
   else if (cmd === 'textos') await extrairLotes(MODELO, 'textos_em IS NULL', true);
   else if (cmd === 'resultados' && a1) await resultados(a1);
-  else console.log('Uso: npx tsx scripts/carga-compendio.ts produtos | bulas [limite] [reg] | extrair [limite] [reg] | textos [limite] [reg] | resultados <lote>');
+  else console.log('Uso: npx tsx scripts/carga-compendio.ts produtos | adapar [0] [reg] | bulas [limite] [reg] | extrair [limite] [reg] | textos [limite] [reg] | resultados <lote>');
 } finally {
   await db.end();
 }
